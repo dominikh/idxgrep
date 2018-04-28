@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -89,17 +88,6 @@ func createIndex() {
 type file struct {
 	Path string `json:"path"`
 	Data string `json:"data"`
-}
-
-func index(w io.Writer, path string, data []byte) {
-	d := file{path, string(data)}
-	b, err := json.Marshal(d)
-	if err != nil {
-		panic(err)
-	}
-	w.Write([]byte("{\"index\": {}}\n"))
-	w.Write(b)
-	w.Write([]byte{'\n'})
 }
 
 const INDEX = true
