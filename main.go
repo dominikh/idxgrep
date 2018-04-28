@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -88,19 +89,15 @@ type file struct {
 	Data string `json:"data"`
 }
 
-func index(path string, data []byte) {
-	fmt.Println(len(data))
+func index(w io.Writer, path string, data []byte) {
 	d := file{path, string(data)}
 	b, err := json.Marshal(d)
 	if err != nil {
 		panic(err)
 	}
-	resp, err := http.Post("http://localhost:9200/files/basic_file/", "application/json", bytes.NewReader(b))
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	fmt.Println(resp.StatusCode)
+	w.Write([]byte("{\"index\": {}}\n"))
+	w.Write(b)
+	w.Write([]byte{'\n'})
 }
 
 const INDEX = true
@@ -189,6 +186,14 @@ func main() {
 		t := time.Now()
 		createIndex()
 
+		done := make(chan struct{})
+		pr, pw := io.Pipe()
+		go func() {
+			resp, err := http.Post("http://localhost:9200/files/basic_file/_bulk", "application/x-ndjson", pr)
+			fmt.Println(resp.StatusCode, err)
+			close(done)
+		}()
+
 		f, err := os.Open("/tmp/list")
 		if err != nil {
 			panic(err)
@@ -201,8 +206,12 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			index(path, b)
+
+			index(pw, path, b)
 		}
+		pw.Write([]byte{'\n'})
+		pw.Close()
+		<-done
 		fmt.Println(time.Since(t))
 	}
 
