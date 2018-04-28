@@ -50,7 +50,7 @@ func createIndex() {
 	    }
 	  },
 	  "mappings": {
-	    "basic_file": {
+	    "_doc": {
 	      "_source": {
 	        "enabled": false
 	      },
@@ -191,8 +191,8 @@ type BulkInserter struct {
 	url string
 }
 
-func NewBulkInserter(index, typ string) (*BulkInserter, error) {
-	url := fmt.Sprintf("http://localhost:9200/%s/%s/_bulk", index, typ)
+func NewBulkInserter(index string) (*BulkInserter, error) {
+	url := fmt.Sprintf("http://localhost:9200/%s/_doc/_bulk", index)
 	bi := &BulkInserter{
 		url: url,
 	}
@@ -294,7 +294,7 @@ func main() {
 		for i := 0; i < numWorkers; i++ {
 			go func() {
 				defer wg.Done()
-				bi, err := NewBulkInserter("files", "basic_file")
+				bi, err := NewBulkInserter("files")
 				if err != nil {
 					panic(err)
 				}
