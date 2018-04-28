@@ -60,7 +60,7 @@ func (bi *BulkIndexer) reset() error {
 	return nil
 }
 
-func (bi *BulkIndexer) Index(obj interface{}) error {
+func (bi *BulkIndexer) Index(obj interface{}, id string) error {
 	if bi.done == nil {
 		if err := bi.reset(); err != nil {
 			return err
@@ -71,7 +71,21 @@ func (bi *BulkIndexer) Index(obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	if _, err := bi.w.Write([]byte("{\"index\": {}}\n")); err != nil {
+	type tHdr struct {
+		Index struct {
+			ID string `json:"_id,omitempty"`
+		} `json:"index"`
+	}
+	hdr := tHdr{}
+	hdr.Index.ID = id
+	bhdr, err := json.Marshal(hdr)
+	if err != nil {
+		panic(err)
+	}
+	if _, err := bi.w.Write(bhdr); err != nil {
+		return err
+	}
+	if _, err := bi.w.Write([]byte{'\n'}); err != nil {
 		return err
 	}
 	if _, err := bi.w.Write(b); err != nil {

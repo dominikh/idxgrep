@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp/syntax"
 	"strings"
 	"sync"
@@ -57,7 +58,7 @@ func createIndex() {
             "enabled": false
           },
 	      "properties": {
-	        "path": {
+	        "directory": {
 	          "type": "keyword",
 	          "store": true
 	        },
@@ -85,9 +86,9 @@ func createIndex() {
 	// XXX handle status code
 }
 
-type file struct {
-	Path string `json:"path"`
-	Data string `json:"data"`
+type Document struct {
+	Data      string `json:"data"`
+	Directory string `json:"directory"`
 }
 
 const INDEX = true
@@ -192,7 +193,11 @@ func main() {
 					if err != nil {
 						panic(err)
 					}
-					if err := bi.Index(file{path, string(b)}); err != nil {
+					doc := Document{
+						Data:      string(b),
+						Directory: "file://" + filepath.Dir(path),
+					}
+					if err := bi.Index(doc, "file://"+path); err != nil {
 						panic(err)
 					}
 				}
