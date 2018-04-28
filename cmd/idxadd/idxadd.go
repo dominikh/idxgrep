@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"honnef.co/go/idxgrep/classify"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
 )
@@ -36,11 +37,19 @@ func main() {
 				panic(err)
 			}
 			for path := range ch {
-				fmt.Println("Indexing", path)
 				b, err := ioutil.ReadFile(path)
 				if err != nil {
 					panic(err)
 				}
+				n := len(b)
+				if n > 4096 {
+					n = 4096
+				}
+				if classify.IsBinary(b[:n]) {
+					fmt.Printf("Skipping %q because it seems to be a binary file\n", path)
+					continue
+				}
+				fmt.Printf("Indexing %q\n", path)
 				doc := es.Document{
 					Data:      string(b),
 					Directory: "file://" + filepath.Dir(path),
