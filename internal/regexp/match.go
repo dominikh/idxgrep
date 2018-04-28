@@ -400,6 +400,11 @@ func (g *Grep) Reader(r io.Reader, name string) {
 		prefix = name + ":"
 	}
 	for {
+		if len(buf) == cap(buf) {
+			nbuf := make([]byte, len(buf), len(buf)*2)
+			copy(nbuf, buf)
+			buf = nbuf
+		}
 		n, err := io.ReadFull(r, buf[len(buf):cap(buf)])
 		buf = buf[:len(buf)+n]
 		end := len(buf)
