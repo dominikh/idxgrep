@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"regexp/syntax"
 	"strings"
+	"sync"
 	"time"
 
 	"honnef.co/go/codesearch2/parser"
@@ -181,18 +183,100 @@ type searchResult struct {
 	Hits searchHits `json:"hits"`
 }
 
+type BulkInserter struct {
+	w    io.WriteCloser
+	done chan error
+}
+
+func NewBulkInserter(index, typ string) (*BulkInserter, error) {
+	pr, pw := io.Pipe()
+	done := make(chan error, 1)
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost:9200/%s/%s/_bulk", index, typ), pr)
+	req.Header.Set("Content-Type", "application/x-ndjson")
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			done <- err
+			return
+		}
+		if resp.StatusCode >= 400 {
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				done <- errors.New("non-200 status code but also failed to read error from response")
+				return
+			}
+			done <- errors.New(string(b))
+			return
+		}
+		close(done)
+	}()
+	return &BulkInserter{
+		w:    pw,
+		done: done,
+	}, nil
+}
+
+func (bi *BulkInserter) Index(obj interface{}) error {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	if _, err := bi.w.Write([]byte("{\"index\": {}}\n")); err != nil {
+		return err
+	}
+	if _, err := bi.w.Write(b); err != nil {
+		return err
+	}
+	if _, err := bi.w.Write([]byte{'\n'}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bi *BulkInserter) Close() error {
+	if _, err := bi.w.Write([]byte{'\n'}); err != nil {
+		_ = bi.w.Close()
+		return err
+	}
+	if err := bi.w.Close(); err != nil {
+		return err
+	}
+	return <-bi.done
+}
+
 func main() {
 	if INDEX {
 		t := time.Now()
 		createIndex()
 
-		done := make(chan struct{})
-		pr, pw := io.Pipe()
-		go func() {
-			resp, err := http.Post("http://localhost:9200/files/basic_file/_bulk", "application/x-ndjson", pr)
-			fmt.Println(resp.StatusCode, err)
-			close(done)
-		}()
+		numWorkers := 4
+		ch := make(chan string)
+		wg := sync.WaitGroup{}
+		wg.Add(numWorkers)
+		for i := 0; i < numWorkers; i++ {
+			go func() {
+				defer wg.Done()
+				bi, err := NewBulkInserter("files", "basic_file")
+				if err != nil {
+					panic(err)
+				}
+				for path := range ch {
+					b, err := ioutil.ReadFile(path)
+					if err != nil {
+						panic(err)
+					}
+					if err := bi.Index(file{path, string(b)}); err != nil {
+						panic(err)
+					}
+				}
+				if err := bi.Close(); err != nil {
+					panic(err)
+				}
+			}()
+		}
 
 		f, err := os.Open("/tmp/list")
 		if err != nil {
@@ -200,18 +284,10 @@ func main() {
 		}
 		sc := bufio.NewScanner(f)
 		for sc.Scan() {
-			name := sc.Text()
-			path := name
-			b, err := ioutil.ReadFile(path)
-			if err != nil {
-				panic(err)
-			}
-
-			index(pw, path, b)
+			ch <- sc.Text()
 		}
-		pw.Write([]byte{'\n'})
-		pw.Close()
-		<-done
+		close(ch)
+		wg.Wait()
 		fmt.Println(time.Since(t))
 	}
 
