@@ -83,7 +83,7 @@ func createIndex() {
 		panic(err)
 	}
 	defer resp.Body.Close()
-	fmt.Println(resp.StatusCode)
+	// XXX handle status code
 }
 
 type file struct {
@@ -186,22 +186,39 @@ type searchResult struct {
 type BulkInserter struct {
 	w    io.WriteCloser
 	done chan error
+	size int
+
+	url string
 }
 
 func NewBulkInserter(index, typ string) (*BulkInserter, error) {
+	url := fmt.Sprintf("http://localhost:9200/%s/%s/_bulk", index, typ)
+	bi := &BulkInserter{
+		url: url,
+	}
+	return bi, nil
+}
+
+func (bi *BulkInserter) reset() error {
 	pr, pw := io.Pipe()
 	done := make(chan error, 1)
-	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost:9200/%s/%s/_bulk", index, typ), pr)
+	req, err := http.NewRequest("POST", bi.url, pr)
 	req.Header.Set("Content-Type", "application/x-ndjson")
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	bi.w = pw
+	bi.done = done
+	bi.size = 0
+
 	go func() {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			done <- err
 			return
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			b, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
@@ -213,13 +230,17 @@ func NewBulkInserter(index, typ string) (*BulkInserter, error) {
 		}
 		close(done)
 	}()
-	return &BulkInserter{
-		w:    pw,
-		done: done,
-	}, nil
+
+	return nil
 }
 
 func (bi *BulkInserter) Index(obj interface{}) error {
+	if bi.done == nil {
+		if err := bi.reset(); err != nil {
+			return err
+		}
+	}
+
 	b, err := json.Marshal(obj)
 	if err != nil {
 		return err
@@ -233,10 +254,18 @@ func (bi *BulkInserter) Index(obj interface{}) error {
 	if _, err := bi.w.Write([]byte{'\n'}); err != nil {
 		return err
 	}
+
+	bi.size += len(b)
+	if bi.size > 1024*1024*8 {
+		return bi.Flush()
+	}
 	return nil
 }
 
 func (bi *BulkInserter) Close() error {
+	if bi.done == nil {
+		return nil
+	}
 	if _, err := bi.w.Write([]byte{'\n'}); err != nil {
 		_ = bi.w.Close()
 		return err
@@ -244,7 +273,13 @@ func (bi *BulkInserter) Close() error {
 	if err := bi.w.Close(); err != nil {
 		return err
 	}
-	return <-bi.done
+	err := <-bi.done
+	bi.done = nil
+	return err
+}
+
+func (bi *BulkInserter) Flush() error {
+	return bi.Close()
 }
 
 func main() {
@@ -298,7 +333,6 @@ func main() {
 		}
 		q := parser.RegexpQuery(re)
 
-		//fmt.Println(q)
 		s := search{Query: queryToES(q), Fields: []string{"path"}}
 		b, err := json.Marshal(s)
 		if err != nil {
