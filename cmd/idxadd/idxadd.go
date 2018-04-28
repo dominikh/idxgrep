@@ -8,10 +8,16 @@ import (
 	"sync"
 	"time"
 
+	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
 )
 
 func main() {
+	cfg, err := config.LoadFile(config.DefaultPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error loading configuration:", err)
+		os.Exit(1)
+	}
 	client := es.Client{
 		Base: "http://localhost:9200",
 	}
@@ -60,6 +66,10 @@ func main() {
 		path, err = filepath.Abs(path)
 		if err != nil {
 			fmt.Println("Couldn't determine absolute path:", err)
+			return nil
+		}
+		if size := info.Size(); size > int64(cfg.Indexing.MaxFilesize) && cfg.Indexing.MaxFilesize > 0 {
+			fmt.Printf("Skipping %q, %d bytes is larger than configured maximum of %d\n", path, size, cfg.Indexing.MaxFilesize)
 			return nil
 		}
 		ch <- path
