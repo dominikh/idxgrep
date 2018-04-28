@@ -69,7 +69,7 @@ func main() {
 			fmt.Println(err)
 			return nil
 		}
-		if info.IsDir() {
+		if info.Mode()&os.ModeType != 0 {
 			return nil
 		}
 		path, err = filepath.Abs(path)
