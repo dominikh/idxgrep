@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+type Document struct {
+	Data      string `json:"data"`
+	Directory string `json:"directory"`
+}
+
 type Client struct {
 	Base string
 }
