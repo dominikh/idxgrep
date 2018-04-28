@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"honnef.co/go/codesearch2/parser"
-	"honnef.co/go/codesearch3/internal/regexp"
+	"honnef.co/go/idxgrep/internal/parser"
+	"honnef.co/go/idxgrep/internal/regexp"
 )
 
 func createIndex() {

@@ -13,7 +13,7 @@ import (
 	"regexp/syntax"
 	"sort"
 
-	"honnef.co/go/codesearch/sparse"
+	"honnef.co/go/idxgrep/internal/sparse"
 )
 
 // A matcher holds the state for running regular expression search.
