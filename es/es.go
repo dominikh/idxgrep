@@ -7,7 +7,79 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
+
+type Client struct {
+	Base string
+}
+
+func (client *Client) CreateIndex() error {
+	body := `
+	{
+	  "settings": {
+	    "number_of_shards": 1,
+	    "number_of_replicas": 0,
+	    "analysis": {
+	      "filter": {
+	        "trigram_filter": {
+	          "type": "ngram",
+	          "min_gram": 3,
+	          "max_gram": 3
+	        }
+	      },
+          "tokenizer": {
+            "trigram": {
+              "type": "ngram",
+              "min_gram": 3,
+              "max_gram": 3
+            }
+          },
+	      "analyzer": {
+	        "trigram": {
+	          "type": "custom",
+	          "tokenizer": "trigram"
+	        }
+	      }
+	    }
+	  },
+	  "mappings": {
+	    "_doc": {
+	      "_source": {
+	        "enabled": false
+	      },
+          "_all": {
+            "enabled": false
+          },
+	      "properties": {
+	        "directory": {
+	          "type": "keyword",
+	          "store": true
+	        },
+	        "data": {
+	          "type": "text",
+	          "analyzer": "trigram",
+              "index_options": "docs"
+	        }
+	      }
+	    }
+	  }
+	}
+	`
+
+	req, err := http.NewRequest("PUT", client.Base+"/files", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+	// XXX handle status code
+}
 
 type BulkIndexer struct {
 	w    io.WriteCloser
@@ -17,8 +89,8 @@ type BulkIndexer struct {
 	url string
 }
 
-func NewBulkInserter(index string) (*BulkIndexer, error) {
-	url := fmt.Sprintf("http://localhost:9200/%s/_doc/_bulk", index)
+func (client *Client) BulkInsert() (*BulkIndexer, error) {
+	url := fmt.Sprintf("%s/files/_doc/_bulk", client.Base)
 	bi := &BulkIndexer{
 		url: url,
 	}

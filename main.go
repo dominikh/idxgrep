@@ -2,16 +2,12 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp/syntax"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,162 +16,21 @@ import (
 	"honnef.co/go/idxgrep/internal/regexp"
 )
 
-func createIndex() {
-	body := `
-	{
-	  "settings": {
-	    "number_of_shards": 1,
-	    "number_of_replicas": 0,
-	    "analysis": {
-	      "filter": {
-	        "trigram_filter": {
-	          "type": "ngram",
-	          "min_gram": 3,
-	          "max_gram": 3
-	        }
-	      },
-          "tokenizer": {
-            "trigram": {
-              "type": "ngram",
-              "min_gram": 3,
-              "max_gram": 3
-            }
-          },
-	      "analyzer": {
-	        "trigram": {
-	          "type": "custom",
-	          "tokenizer": "trigram"
-	        }
-	      }
-	    }
-	  },
-	  "mappings": {
-	    "_doc": {
-	      "_source": {
-	        "enabled": false
-	      },
-          "_all": {
-            "enabled": false
-          },
-	      "properties": {
-	        "directory": {
-	          "type": "keyword",
-	          "store": true
-	        },
-	        "data": {
-	          "type": "text",
-	          "analyzer": "trigram",
-              "index_options": "docs"
-	        }
-	      }
-	    }
-	  }
-	}
-	`
-
-	req, err := http.NewRequest("PUT", "http://localhost:9200/files", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	if err != nil {
-		panic(err)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	// XXX handle status code
-}
-
 type Document struct {
 	Data      string `json:"data"`
 	Directory string `json:"directory"`
 }
 
-const INDEX = true
-const QUERY = false
-
-type search struct {
-	Query  boolQuery `json:"query"`
-	Fields []string  `json:"stored_fields"`
-}
-
-type boolQuery struct {
-	And       []interface{}
-	Or        []interface{}
-	MinimumOr int
-}
-
-func (q boolQuery) MarshalJSON() ([]byte, error) {
-	qq := struct {
-		And       []interface{} `json:"must,omitempty"`
-		Or        []interface{} `json:"should,omitempty"`
-		MinimumOr int           `json:"minimum_should_match"`
-	}(q)
-	v := struct {
-		Bool interface{} `json:"bool"`
-	}{qq}
-	return json.Marshal(v)
-}
-
-type term string
-
-func (t term) MarshalJSON() ([]byte, error) {
-	type typ struct {
-		Term struct {
-			Data string `json:"data"`
-		} `json:"term"`
-	}
-	d := typ{}
-	d.Term.Data = string(t)
-	return json.Marshal(d)
-}
-
-func queryToES(q *parser.Query) boolQuery {
-	out := boolQuery{}
-	switch q.Op {
-	case parser.QAll:
-		panic("not implemented")
-	case parser.QNone:
-		panic("not implemented")
-	case parser.QAnd:
-		for _, tri := range q.Trigram {
-			out.And = append(out.And, term(tri))
-		}
-		for _, sq := range q.Sub {
-			out.And = append(out.And, queryToES(sq))
-		}
-	case parser.QOr:
-		for _, tri := range q.Trigram {
-			out.Or = append(out.Or, term(tri))
-		}
-		for _, sq := range q.Sub {
-			out.Or = append(out.Or, queryToES(sq))
-		}
-	}
-	if len(out.Or) > 0 {
-		out.MinimumOr = 1
-	}
-	return out
-}
-
-type searchHit struct {
-	Fields struct {
-		Path []string `json:"path"`
-	} `json:"fields"`
-}
-
-type searchHits struct {
-	Hits []searchHit `json:"hits"`
-}
-
-type searchResult struct {
-	Hits searchHits `json:"hits"`
-}
+const INDEX = false
+const QUERY = true
 
 func main() {
+	client := es.Client{
+		Base: "http://localhost:9200",
+	}
 	if INDEX {
 		t := time.Now()
-		createIndex()
+		client.CreateIndex()
 
 		numWorkers := 4
 		ch := make(chan string)
@@ -184,7 +39,7 @@ func main() {
 		for i := 0; i < numWorkers; i++ {
 			go func() {
 				defer wg.Done()
-				bi, err := es.NewBulkInserter("files")
+				bi, err := client.BulkInsert()
 				if err != nil {
 					panic(err)
 				}
@@ -227,23 +82,7 @@ func main() {
 		}
 		q := parser.RegexpQuery(re)
 
-		s := search{Query: queryToES(q), Fields: []string{"path"}}
-		b, err := json.Marshal(s)
-		if err != nil {
-			panic(err)
-		}
-
-		resp, err := http.Post("http://localhost:9200/files/_search?size=10000", "application/json", bytes.NewReader(b))
-		if err != nil {
-			panic(err)
-		}
-		defer resp.Body.Close()
-
-		res := searchResult{}
-		err = json.NewDecoder(resp.Body).Decode(&res)
-		if err != nil {
-			panic(err)
-		}
+		hits := client.Search(q)
 
 		ree, _ := regexp.Compile(`(bro|to)ken`)
 		grep := regexp.Grep{
@@ -253,9 +92,9 @@ func main() {
 		}
 		grep.AddFlags()
 		flag.Parse()
-		for _, hit := range res.Hits.Hits {
-			name := hit.Fields.Path[0]
-			f, err := os.Open(name)
+		for _, hit := range hits {
+			name := hit.ID
+			f, err := os.Open(name[len("file://"):])
 			if err != nil {
 				panic(err)
 			}
