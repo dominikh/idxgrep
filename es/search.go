@@ -45,7 +45,11 @@ func (t term) MarshalJSON() ([]byte, error) {
 }
 
 type SearchHit struct {
-	ID string `json:"_id"`
+	ID     string `json:"_id"`
+	Fields struct {
+		Name []string `json:"name"`
+		Path []string `json:"path"`
+	}
 }
 
 type searchHits struct {
@@ -85,7 +89,10 @@ func queryToES(q *parser.Query) boolQuery {
 }
 
 func (client *Client) Search(q *parser.Query) []SearchHit {
-	s := search{Query: queryToES(q)}
+	s := search{
+		Query:  queryToES(q),
+		Fields: []string{"name", "path"},
+	}
 	b, err := json.Marshal(s)
 	if err != nil {
 		panic(err)

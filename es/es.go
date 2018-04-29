@@ -11,8 +11,9 @@ import (
 )
 
 type Document struct {
-	Data      string `json:"data"`
-	Directory string `json:"directory"`
+	Data string `json:"data"`
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 type Client struct {
@@ -31,13 +32,21 @@ func (client *Client) CreateIndex() error {
               "type": "ngram",
               "min_gram": 3,
               "max_gram": 3
-            }
+            },
+           "path": {
+             "type": "path_hierarchy",
+             "delimiter": "/"
+           }
           },
 	      "analyzer": {
 	        "trigram": {
 	          "type": "custom",
 	          "tokenizer": "trigram"
-	        }
+	        },
+           "path": {
+             "type": "custom",
+             "tokenizer": "path"
+           }
 	      }
 	    }
 	  },
@@ -50,9 +59,14 @@ func (client *Client) CreateIndex() error {
             "enabled": false
           },
 	      "properties": {
-	        "directory": {
-	          "type": "keyword",
-	          "store": true
+            "name": {
+              "type": "keyword",
+              "store": true
+            },
+	        "path": {
+	          "type": "text",
+              "analyzer": "path",
+              "store": true
 	        },
 	        "data": {
 	          "type": "text",
@@ -75,6 +89,7 @@ func (client *Client) CreateIndex() error {
 		return err
 	}
 	defer resp.Body.Close()
+	fmt.Println(resp.StatusCode)
 	return nil
 	// XXX handle status code
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -51,10 +53,12 @@ func main() {
 				}
 				fmt.Printf("Indexing %q\n", path)
 				doc := es.Document{
-					Data:      string(b),
-					Directory: "file://" + filepath.Dir(path),
+					Data: string(b),
+					Name: filepath.Base(path),
+					Path: filepath.Dir(path),
 				}
-				if err := bi.Index(doc, "file://"+path); err != nil {
+				id := sha256.Sum256([]byte(path))
+				if err := bi.Index(doc, hex.EncodeToString(id[:])); err != nil {
 					panic(err)
 				}
 			}
