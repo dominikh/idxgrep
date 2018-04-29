@@ -29,7 +29,8 @@ func main() {
 		log.Fatalln("Error loading configuration:", err)
 	}
 	client := es.Client{
-		Base: "http://localhost:9200",
+		Base:  cfg.Global.Server,
+		Index: cfg.Global.Index,
 	}
 	t := time.Now()
 	client.CreateIndex()

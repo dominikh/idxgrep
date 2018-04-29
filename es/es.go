@@ -16,7 +16,8 @@ type Document struct {
 }
 
 type Client struct {
-	Base string
+	Base  string
+	Index string
 }
 
 func (client *Client) CreateIndex() error {
@@ -78,7 +79,7 @@ func (client *Client) CreateIndex() error {
 	}
 	`
 
-	req, err := http.NewRequest("PUT", client.Base+"/files", strings.NewReader(body))
+	req, err := http.NewRequest("PUT", client.Base+"/"+client.Index, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return err
@@ -94,7 +95,7 @@ func (client *Client) CreateIndex() error {
 }
 
 func (client *Client) BulkInsert() *BulkIndexer {
-	url := fmt.Sprintf("%s/files/_doc/_bulk", client.Base)
+	url := fmt.Sprintf("%s/%s/_doc/_bulk", client.Base, client.Index)
 	bi := &BulkIndexer{
 		url: url,
 	}
@@ -183,7 +184,7 @@ func (client *Client) DeleteByQuery(q interface{}) (*ByQueryResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Post(client.Base+"/files/_delete_by_query", "application/json", bytes.NewReader(b))
+	resp, err := http.Post(client.Base+"/"+client.Index+"/_delete_by_query", "application/json", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}

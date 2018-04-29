@@ -16,8 +16,24 @@ type FormatError struct {
 
 var DefaultPath = filepath.Join(configdir.LocalConfig("idxgrep"), "idxgrep.conf")
 
+var DefaultConfig = Config{
+	Global: Global{
+		Server: "http://localhost:9200",
+		Index:  "files",
+	},
+	Indexing: Indexing{
+		MaxFilesize: 10485760,
+	},
+}
+
 type Config struct {
+	Global   Global   `toml:"global"`
 	Indexing Indexing `toml:"indexing"`
+}
+
+type Global struct {
+	Server string `toml:"server"`
+	Index  string `toml:"index"`
 }
 
 type Indexing struct {
@@ -29,7 +45,7 @@ func Load(r io.Reader) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cfg Config
+	cfg := DefaultConfig
 	err = toml.Unmarshal(b, &cfg)
 	if err != nil {
 		return nil, FormatError{err}

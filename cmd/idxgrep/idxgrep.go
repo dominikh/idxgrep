@@ -3,16 +3,23 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
 	_ "honnef.co/go/idxgrep/cmd"
+	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
 	"honnef.co/go/idxgrep/internal/parser"
 	"honnef.co/go/idxgrep/internal/regexp"
 )
 
 func main() {
+	cfg, err := config.LoadFile(config.DefaultPath)
+	if err != nil {
+		log.Fatalln("Error loading configuration:", err)
+	}
+
 	grep := regexp.Grep{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
@@ -33,7 +40,8 @@ func main() {
 	grep.Regexp = re
 
 	client := es.Client{
-		Base: "http://localhost:9200",
+		Base:  cfg.Global.Server,
+		Index: cfg.Global.Index,
 	}
 
 	hits := client.Search(q)
