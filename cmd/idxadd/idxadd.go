@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -17,6 +18,12 @@ import (
 )
 
 func main() {
+	var (
+		fVerbose bool
+	)
+	flag.BoolVar(&fVerbose, "v", false, "Verbose output")
+	flag.Parse()
+
 	cfg, err := config.LoadFile(config.DefaultPath)
 	if err != nil {
 		log.Fatalln(exit.Guess(err), "Error loading configuration:", err)
@@ -53,10 +60,14 @@ func main() {
 				}
 				if classify.IsBinary(b[:n]) {
 					skipped++
-					log.Printf("Skipping %q because it seems to be a binary file", path)
+					if fVerbose {
+						log.Printf("Skipping %q because it seems to be a binary file", path)
+					}
 					continue
 				}
-				log.Printf("Indexing %q", path)
+				if fVerbose {
+					log.Printf("Indexing %q", path)
+				}
 				indexed++
 				doc := es.Document{
 					Data: string(b),
@@ -76,7 +87,7 @@ func main() {
 		}()
 	}
 
-	filepath.Walk(os.Args[1], func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(flag.Args()[0], func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Println(err)
 			return nil
@@ -90,7 +101,9 @@ func main() {
 			return nil
 		}
 		if size := info.Size(); size > int64(cfg.Indexing.MaxFilesize) && cfg.Indexing.MaxFilesize > 0 {
-			log.Printf("Skipping %q, %d bytes is larger than configured maximum of %d", path, size, cfg.Indexing.MaxFilesize)
+			if fVerbose {
+				log.Printf("Skipping %q, %d bytes is larger than configured maximum of %d", path, size, cfg.Indexing.MaxFilesize)
+			}
 			return nil
 		}
 		ch <- path
