@@ -50,6 +50,7 @@ replicas.
 
 The automatically created index is as follows:
 
+```
 {
   "settings": {
     "number_of_shards": 1,
