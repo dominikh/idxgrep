@@ -5,16 +5,16 @@ import (
 	"encoding/hex"
 	"flag"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"honnef.co/go/idxgrep/classify"
+	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
-	"honnef.co/go/idxgrep/exit"
-	"honnef.co/go/idxgrep/log"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 
 	cfg, err := config.LoadFile(config.DefaultPath)
 	if err != nil {
-		log.Fatalln(exit.Guess(err), "Error loading configuration:", err)
+		log.Fatalln("Error loading configuration:", err)
 	}
 	client := es.Client{
 		Base: "http://localhost:9200",
@@ -76,11 +76,11 @@ func main() {
 				}
 				id := sha256.Sum256([]byte(path))
 				if err := bi.Index(doc, hex.EncodeToString(id[:])); err != nil {
-					log.Fatalln(exit.Guess(err), "Error indexing files:", err)
+					log.Fatalln("Error indexing files:", err)
 				}
 			}
 			if err := bi.Close(); err != nil {
-				log.Fatalln(exit.Guess(err), "Error indexing files:", err)
+				log.Fatalln("Error indexing files:", err)
 			}
 			indexedTotal[i] = indexed
 			skippedTotal[i] = skipped

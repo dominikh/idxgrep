@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/es"
 	"honnef.co/go/idxgrep/internal/parser"
 	"honnef.co/go/idxgrep/internal/regexp"

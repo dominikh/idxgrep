@@ -1,11 +1,11 @@
 package main
 
 import (
+	"log"
 	"os"
 
+	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/es"
-	"honnef.co/go/idxgrep/exit"
-	"honnef.co/go/idxgrep/log"
 	"honnef.co/go/spew"
 )
 
@@ -24,7 +24,7 @@ func main() {
 
 	resp, err := client.DeleteByQuery(q)
 	if err != nil {
-		log.Fatal(exit.Unavailable, err)
+		log.Fatalln(err)
 	}
 	spew.Dump(resp)
 }
