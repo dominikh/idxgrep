@@ -93,12 +93,12 @@ func (client *Client) CreateIndex() error {
 	// XXX handle status code
 }
 
-func (client *Client) BulkInsert() (*BulkIndexer, error) {
+func (client *Client) BulkInsert() *BulkIndexer {
 	url := fmt.Sprintf("%s/files/_doc/_bulk", client.Base)
 	bi := &BulkIndexer{
 		url: url,
 	}
-	return bi, nil
+	return bi
 }
 
 type ByQueryResponse struct {

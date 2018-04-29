@@ -13,13 +13,14 @@ import (
 	"honnef.co/go/idxgrep/classify"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/exit"
+	"honnef.co/go/idxgrep/log"
 )
 
 func main() {
 	cfg, err := config.LoadFile(config.DefaultPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error loading configuration:", err)
-		os.Exit(1)
+		log.Fatalln(exit.Guess(err), "Error loading configuration:", err)
 	}
 	client := es.Client{
 		Base: "http://localhost:9200",
@@ -34,24 +35,22 @@ func main() {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			defer wg.Done()
-			bi, err := client.BulkInsert()
-			if err != nil {
-				panic(err)
-			}
+			bi := client.BulkInsert()
 			for path := range ch {
 				b, err := ioutil.ReadFile(path)
 				if err != nil {
-					panic(err)
+					log.Printf("Skipping %q because of read error: %s", path, err)
+					continue
 				}
 				n := len(b)
 				if n > 4096 {
 					n = 4096
 				}
 				if classify.IsBinary(b[:n]) {
-					fmt.Printf("Skipping %q because it seems to be a binary file\n", path)
+					log.Printf("Skipping %q because it seems to be a binary file", path)
 					continue
 				}
-				fmt.Printf("Indexing %q\n", path)
+				log.Printf("Indexing %q", path)
 				doc := es.Document{
 					Data: string(b),
 					Name: filepath.Base(path),
@@ -59,18 +58,18 @@ func main() {
 				}
 				id := sha256.Sum256([]byte(path))
 				if err := bi.Index(doc, hex.EncodeToString(id[:])); err != nil {
-					panic(err)
+					log.Fatalln(exit.Guess(err), "Error indexing files:", err)
 				}
 			}
 			if err := bi.Close(); err != nil {
-				panic(err)
+				log.Fatalln(exit.Guess(err), "Error indexing files:", err)
 			}
 		}()
 	}
 
 	filepath.Walk(os.Args[1], func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return nil
 		}
 		if info.Mode()&os.ModeType != 0 {
@@ -78,11 +77,11 @@ func main() {
 		}
 		path, err = filepath.Abs(path)
 		if err != nil {
-			fmt.Println("Couldn't determine absolute path:", err)
+			log.Println("Couldn't determine absolute path:", err)
 			return nil
 		}
 		if size := info.Size(); size > int64(cfg.Indexing.MaxFilesize) && cfg.Indexing.MaxFilesize > 0 {
-			fmt.Printf("Skipping %q, %d bytes is larger than configured maximum of %d\n", path, size, cfg.Indexing.MaxFilesize)
+			log.Printf("Skipping %q, %d bytes is larger than configured maximum of %d", path, size, cfg.Indexing.MaxFilesize)
 			return nil
 		}
 		ch <- path

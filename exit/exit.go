@@ -1,5 +1,11 @@
 package exit
 
+import (
+	"os"
+
+	"honnef.co/go/idxgrep/config"
+)
+
 const (
 	// The command was used incorrectly, e.g., with the wrong number
 	// of arguments, a bad flag, a bad syntax in a parameter, or
@@ -69,3 +75,13 @@ const (
 	// Something was found in an unconfigured or misconfigured state.
 	Config = 78
 )
+
+func Guess(err error) int {
+	if os.IsPermission(err) || os.IsNotExist(err) {
+		return NoInput
+	}
+	if _, ok := err.(config.FormatError); ok {
+		return DataErr
+	}
+	return Unavailable
+}

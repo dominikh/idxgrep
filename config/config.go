@@ -10,6 +10,10 @@ import (
 	"github.com/naoina/toml"
 )
 
+type FormatError struct {
+	error
+}
+
 var DefaultPath = filepath.Join(configdir.LocalConfig("idxgrep"), "idxgrep.conf")
 
 type Config struct {
@@ -27,7 +31,10 @@ func Load(r io.Reader) (*Config, error) {
 	}
 	var cfg Config
 	err = toml.Unmarshal(b, &cfg)
-	return &cfg, err
+	if err != nil {
+		return nil, FormatError{err}
+	}
+	return &cfg, nil
 }
 
 func LoadFile(path string) (*Config, error) {
