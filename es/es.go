@@ -3,12 +3,26 @@ package es
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 )
+
+type Error struct {
+	Type         string `json:"type"`
+	Reason       string `json:"reason"`
+	ResourceType string `json:"resource.type"`
+	ResourceID   string `json:"files"`
+	IndexUUID    string `json:"index_uuid"`
+	Index        string `json:"index"`
+}
+
+type APIError struct {
+	Code int
+	Err  Error
+}
 
 type Document struct {
 	Data string `json:"data"`
@@ -85,23 +99,21 @@ func (client *Client) CreateIndex() error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.do(req)
 	if err != nil {
+		if err, ok := err.(APIError); ok {
+			if err.Err.Type == "resource_already_exists_exception" {
+				return nil
+			}
+		}
 		return err
 	}
 	defer resp.Body.Close()
-	fmt.Println(resp.StatusCode)
 	return nil
-	// XXX handle status code
 }
 
-type apiError struct {
-	Code int
-	Body []byte
-}
-
-func (err apiError) Error() string {
-	return fmt.Sprintf("Status code %d\n%s", err.Code, err.Body)
+func (err APIError) Error() string {
+	return fmt.Sprintf("Status code %d - %s", err.Code, err.Err.Type)
 }
 
 func (client *Client) do(req *http.Request) (*http.Response, error) {
@@ -111,11 +123,14 @@ func (client *Client) do(req *http.Request) (*http.Response, error) {
 	}
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
+		type error struct {
+			Error Error `json:"error"`
 		}
-		return nil, apiError{resp.StatusCode, b}
+		var e error
+		if err := json.NewDecoder(resp.Body).Decode(&e); err != nil {
+			return nil, errors.New("API error but couldn't decode it")
+		}
+		return nil, APIError{resp.StatusCode, e.Error}
 	}
 	return resp, nil
 }

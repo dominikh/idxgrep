@@ -33,7 +33,9 @@ func main() {
 		Index: cfg.Global.Index,
 	}
 	t := time.Now()
-	client.CreateIndex()
+	if err := client.CreateIndex(); err != nil {
+		log.Fatal(err)
+	}
 
 	numWorkers := 4
 	ch := make(chan string)
