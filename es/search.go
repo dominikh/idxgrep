@@ -98,11 +98,15 @@ func (client *Client) Search(q *parser.Query) ([]SearchHit, error) {
 		return nil, err
 	}
 
-	resp, err := http.Post(client.Base+"/files/_search?size=10000", "application/json", bytes.NewReader(b))
+	req, err := http.NewRequest("POST", client.Base+"/files/_search?size=10000", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
-	// XXX check response code
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.do(req)
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 
 	res := searchResult{}

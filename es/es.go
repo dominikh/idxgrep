@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -94,10 +95,36 @@ func (client *Client) CreateIndex() error {
 	// XXX handle status code
 }
 
+type apiError struct {
+	Code int
+	Body []byte
+}
+
+func (err apiError) Error() string {
+	return fmt.Sprintf("Status code %d\n%s", err.Code, err.Body)
+}
+
+func (client *Client) do(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, apiError{resp.StatusCode, b}
+	}
+	return resp, nil
+}
+
 func (client *Client) BulkInsert() *BulkIndexer {
 	url := fmt.Sprintf("%s/%s/_doc/_bulk", client.Base, client.Index)
 	bi := &BulkIndexer{
-		url: url,
+		client: client,
+		url:    url,
 	}
 	return bi
 }
@@ -184,12 +211,17 @@ func (client *Client) DeleteByQuery(q interface{}) (*ByQueryResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.Post(client.Base+"/"+client.Index+"/_delete_by_query", "application/json", bytes.NewReader(b))
+
+	req, err := http.NewRequest("POST", client.Base+"/"+client.Index+"/_delete_by_query", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	// XXX handle non-200 status code
 	var stats ByQueryResponse
 	err = json.NewDecoder(resp.Body).Decode(&stats)
 	return &stats, err

@@ -2,16 +2,15 @@ package es
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 )
 
 type BulkIndexer struct {
-	w    io.WriteCloser
-	done chan error
-	size int
+	client *Client
+	w      io.WriteCloser
+	done   chan error
+	size   int
 
 	url string
 }
@@ -30,21 +29,12 @@ func (bi *BulkIndexer) reset() error {
 	bi.size = 0
 
 	go func() {
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := bi.client.do(req)
 		if err != nil {
 			done <- err
 			return
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			b, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				done <- errors.New("non-200 status code but also failed to read error from response")
-				return
-			}
-			done <- errors.New(string(b))
-			return
-		}
 		close(done)
 	}()
 
