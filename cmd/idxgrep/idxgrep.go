@@ -51,8 +51,8 @@ func main() {
 		path := filepath.Join(hit.Fields.Path[0], name)
 		f, err := os.Open(path)
 		if err != nil {
-			// XXX skip files we can't find
-			panic(err)
+			log.Println(err)
+			continue
 		}
 		grep.Reader(f, path)
 		f.Close()
