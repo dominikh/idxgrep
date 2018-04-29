@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -32,13 +31,19 @@ func main() {
 	ch := make(chan string)
 	wg := sync.WaitGroup{}
 	wg.Add(numWorkers)
+	indexedTotal := make([]int, numWorkers)
+	skippedTotal := make([]int, numWorkers)
 	for i := 0; i < numWorkers; i++ {
+		i := i
 		go func() {
 			defer wg.Done()
 			bi := client.BulkInsert()
+			indexed := 0
+			skipped := 0
 			for path := range ch {
 				b, err := ioutil.ReadFile(path)
 				if err != nil {
+					skipped++
 					log.Printf("Skipping %q because of read error: %s", path, err)
 					continue
 				}
@@ -47,10 +52,12 @@ func main() {
 					n = 4096
 				}
 				if classify.IsBinary(b[:n]) {
+					skipped++
 					log.Printf("Skipping %q because it seems to be a binary file", path)
 					continue
 				}
 				log.Printf("Indexing %q", path)
+				indexed++
 				doc := es.Document{
 					Data: string(b),
 					Name: filepath.Base(path),
@@ -64,6 +71,8 @@ func main() {
 			if err := bi.Close(); err != nil {
 				log.Fatalln(exit.Guess(err), "Error indexing files:", err)
 			}
+			indexedTotal[i] = indexed
+			skippedTotal[i] = skipped
 		}()
 	}
 
@@ -89,5 +98,14 @@ func main() {
 	})
 	close(ch)
 	wg.Wait()
-	fmt.Println(time.Since(t))
+
+	indexed := 0
+	skipped := 0
+	for _, count := range indexedTotal {
+		indexed += count
+	}
+	for _, count := range skippedTotal {
+		skipped += count
+	}
+	log.Printf("Indexed %d and skipped %d files in %s", indexed, skipped, time.Since(t))
 }
