@@ -9,8 +9,8 @@ import (
 )
 
 type search struct {
-	Query  boolQuery `json:"query"`
-	Fields []string  `json:"stored_fields,omitempty"`
+	Query  interface{} `json:"query"`
+	Fields []string    `json:"stored_fields,omitempty"`
 }
 
 type boolQuery struct {
@@ -60,13 +60,13 @@ type searchResult struct {
 	Hits searchHits `json:"hits"`
 }
 
-func queryToES(q *parser.Query) boolQuery {
+func queryToES(q *parser.Query) interface{} {
 	out := boolQuery{}
 	switch q.Op {
 	case parser.QAll:
-		panic("not implemented")
+		return map[string]interface{}{"match_all": struct{}{}}
 	case parser.QNone:
-		panic("not implemented")
+		return map[string]interface{}{"match_none": struct{}{}}
 	case parser.QAnd:
 		for _, tri := range q.Trigram {
 			out.And = append(out.And, term(tri))
