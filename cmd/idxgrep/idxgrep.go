@@ -44,7 +44,10 @@ func main() {
 		Index: cfg.Global.Index,
 	}
 
-	hits := client.Search(q)
+	hits, err := client.Search(q)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for _, hit := range hits {
 		name := hit.Fields.Name[0]

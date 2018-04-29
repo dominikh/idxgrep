@@ -88,19 +88,19 @@ func queryToES(q *parser.Query) interface{} {
 	return out
 }
 
-func (client *Client) Search(q *parser.Query) []SearchHit {
+func (client *Client) Search(q *parser.Query) ([]SearchHit, error) {
 	s := search{
 		Query:  queryToES(q),
 		Fields: []string{"name", "path"},
 	}
 	b, err := json.Marshal(s)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	resp, err := http.Post(client.Base+"/files/_search?size=10000", "application/json", bytes.NewReader(b))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	// XXX check response code
 	defer resp.Body.Close()
@@ -108,7 +108,7 @@ func (client *Client) Search(q *parser.Query) []SearchHit {
 	res := searchResult{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return res.Hits.Hits
+	return res.Hits.Hits, nil
 }
