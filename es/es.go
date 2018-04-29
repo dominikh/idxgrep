@@ -26,13 +26,6 @@ func (client *Client) CreateIndex() error {
 	    "number_of_shards": 1,
 	    "number_of_replicas": 0,
 	    "analysis": {
-	      "filter": {
-	        "trigram_filter": {
-	          "type": "ngram",
-	          "min_gram": 3,
-	          "max_gram": 3
-	        }
-	      },
           "tokenizer": {
             "trigram": {
               "type": "ngram",
