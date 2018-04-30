@@ -54,6 +54,13 @@ func (client *Client) CreateIndex() error {
              "delimiter": "/"
            }
           },
+          "char_filter": {
+            "nul_to_slash": {
+              "type": "pattern_replace",
+              "pattern": "\u0000",
+              "replacement": ""
+            }
+          },
 	      "analyzer": {
 	        "trigram": {
 	          "type": "custom",
@@ -61,8 +68,9 @@ func (client *Client) CreateIndex() error {
 	        },
            "path": {
              "type": "custom",
-             "tokenizer": "path"
-           }
+             "tokenizer": "path",
+             "char_filter": ["nul_to_slash"]
+            }
 	      }
 	    }
 	  },

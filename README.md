@@ -67,6 +67,13 @@ The automatically created index is as follows:
          "delimiter": "/"
        }
       },
+      "char_filter": {
+        "nul_to_slash": {
+        "type": "pattern_replace",
+        "pattern": "\u0000",
+        "replacement": ""
+       }
+      },
       "analyzer": {
         "trigram": {
           "type": "custom",
@@ -74,7 +81,8 @@ The automatically created index is as follows:
         },
        "path": {
          "type": "custom",
-         "tokenizer": "path"
+         "tokenizer": "path",
+         "char_filter": ["nul_to_slash"]
        }
       }
     }
