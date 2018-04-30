@@ -62,28 +62,28 @@ The automatically created index is as follows:
           "min_gram": 3,
           "max_gram": 3
         },
-       "path": {
-         "type": "path_hierarchy",
-         "delimiter": "/"
-       }
+        "path": {
+          "type": "path_hierarchy",
+          "delimiter": "/"
+        }
       },
       "char_filter": {
         "nul_to_slash": {
-        "type": "pattern_replace",
-        "pattern": "\u0000",
-        "replacement": ""
-       }
+          "type": "pattern_replace",
+          "pattern": "\u0000",
+          "replacement": ""
+        }
       },
       "analyzer": {
         "trigram": {
           "type": "custom",
           "tokenizer": "trigram"
         },
-       "path": {
-         "type": "custom",
-         "tokenizer": "path",
-         "char_filter": ["nul_to_slash"]
-       }
+        "path": {
+          "type": "custom",
+          "tokenizer": "path",
+          "char_filter": ["nul_to_slash"]
+        }
       }
     }
   },

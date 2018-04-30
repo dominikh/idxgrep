@@ -49,10 +49,10 @@ func (client *Client) CreateIndex() error {
               "min_gram": 3,
               "max_gram": 3
             },
-           "path": {
-             "type": "path_hierarchy",
-             "delimiter": "/"
-           }
+            "path": {
+              "type": "path_hierarchy",
+              "delimiter": "/"
+            }
           },
           "char_filter": {
             "nul_to_slash": {
@@ -66,10 +66,10 @@ func (client *Client) CreateIndex() error {
 	          "type": "custom",
 	          "tokenizer": "trigram"
 	        },
-           "path": {
-             "type": "custom",
-             "tokenizer": "path",
-             "char_filter": ["nul_to_slash"]
+            "path": {
+              "type": "custom",
+              "tokenizer": "path",
+              "char_filter": ["nul_to_slash"]
             }
 	      }
 	    }
