@@ -6,15 +6,14 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"honnef.co/go/idxgrep/classify"
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/indexer"
 )
 
 func main() {
@@ -38,7 +37,7 @@ func main() {
 	}
 
 	numWorkers := 4
-	ch := make(chan string)
+	ch := make(chan indexer.File)
 	wg := sync.WaitGroup{}
 	wg.Add(numWorkers)
 	indexedTotal := make([]int, numWorkers)
@@ -50,34 +49,29 @@ func main() {
 			bi := client.BulkInsert()
 			indexed := 0
 			skipped := 0
-			for path := range ch {
-				b, err := ioutil.ReadFile(path)
+			for f := range ch {
+				rc, err := f.Open()
 				if err != nil {
 					skipped++
-					log.Printf("Skipping %q because of read error: %s", path, err)
+					log.Printf("Skipping %q because of read error: %s", f.Path(), err)
 					continue
 				}
-				n := len(b)
-				if n > 4096 {
-					n = 4096
-				}
-				if classify.IsBinary(b[:n]) {
+				b, err := ioutil.ReadAll(rc)
+				if err != nil {
 					skipped++
-					if fVerbose {
-						log.Printf("Skipping %q because it seems to be a binary file", path)
-					}
+					log.Printf("Skipping %q because of read error: %s", f.Path(), err)
 					continue
 				}
 				if fVerbose {
-					log.Printf("Indexing %q", path)
+					log.Printf("Indexing %q", f.Path())
 				}
 				indexed++
 				doc := es.Document{
 					Data: string(b),
-					Name: filepath.Base(path),
-					Path: filepath.Dir(path),
+					Name: filepath.Base(f.Path()),
+					Path: filepath.Dir(f.Path()),
 				}
-				id := sha256.Sum256([]byte(path))
+				id := sha256.Sum256([]byte(f.Path()))
 				if err := bi.Index(doc, hex.EncodeToString(id[:])); err != nil {
 					log.Fatalln("Error indexing files:", err)
 				}
@@ -90,33 +84,41 @@ func main() {
 		}()
 	}
 
-	filepath.Walk(flag.Args()[0], func(path string, info os.FileInfo, err error) error {
+	indexed := 0
+	skipped := 0
+
+	m := indexer.Master{
+		Processors: []indexer.Processor{
+			indexer.GitProcessor{},
+			indexer.DirectoryProcessor{},
+			indexer.BinaryFilter{},
+			indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
+			indexer.SpecialFileFilter{},
+		},
+	}
+	root, err := filepath.Abs(flag.Args()[0])
+	if err != nil {
+		log.Fatalln("Couldn't determine absolute path:", err)
+	}
+	cb := func(f indexer.File, err error) {
 		if err != nil {
-			log.Println(err)
-			return nil
+			log.Println("Couldn't process file:", err)
 		}
-		if info.Mode()&os.ModeType != 0 {
-			return nil
+		ch <- f
+	}
+	filtered := func(f indexer.File, proc indexer.Processor) {
+		skipped++
+		if fVerbose {
+			log.Printf("Filtered %q by %T", f.Path(), proc)
 		}
-		path, err = filepath.Abs(path)
-		if err != nil {
-			log.Println("Couldn't determine absolute path:", err)
-			return nil
-		}
-		if size := info.Size(); size > int64(cfg.Indexing.MaxFilesize) && cfg.Indexing.MaxFilesize > 0 {
-			if fVerbose {
-				log.Printf("Skipping %q, %d bytes is larger than configured maximum of %d", path, size, cfg.Indexing.MaxFilesize)
-			}
-			return nil
-		}
-		ch <- path
-		return nil
-	})
+	}
+	if err := m.Process(indexer.OSFile(root), cb, filtered); err != nil {
+		log.Fatal("Error processing files:", err)
+	}
+
 	close(ch)
 	wg.Wait()
 
-	indexed := 0
-	skipped := 0
 	for _, count := range indexedTotal {
 		indexed += count
 	}
