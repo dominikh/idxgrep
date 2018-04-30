@@ -46,7 +46,14 @@ outer:
 	}
 }
 
-func Stat(path string) (os.FileInfo, error) {
+func Lstat(path string) (os.FileInfo, error) {
+	if !strings.Contains(path, "\x00") {
+		// TODO(dh): this isn't technically correct because of
+		// information like file size that may be changed by
+		// transparent decompression. but for current consumers, this
+		// should be fine.
+		return os.Lstat(path)
+	}
 	f, err := Open(path)
 	if err != nil {
 		return nil, err

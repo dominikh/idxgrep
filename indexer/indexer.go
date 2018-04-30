@@ -9,7 +9,11 @@ import (
 	"honnef.co/go/idxgrep/fs"
 )
 
-type Filter interface {
+type StatFilter interface {
+	Filter(os.FileInfo) (drop bool, err error)
+}
+
+type FileFilter interface {
 	Filter(fs.File) (drop bool, err error)
 }
 
@@ -76,11 +80,7 @@ func (filter SizeFilter) Filter(f fs.File) (drop bool, err error) {
 
 type SpecialFileFilter struct{}
 
-func (SpecialFileFilter) Filter(f fs.File) (drop bool, err error) {
-	fi, err := f.Stat()
-	if err != nil {
-		return false, err
-	}
+func (SpecialFileFilter) Filter(fi os.FileInfo) (drop bool, err error) {
 	if fi.IsDir() {
 		return false, nil
 	}

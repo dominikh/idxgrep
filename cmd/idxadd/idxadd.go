@@ -84,13 +84,15 @@ func main() {
 	indexed := 0
 	skipped := 0
 
-	filters := []indexer.Filter{
-		indexer.GitFilter{},
-		indexer.BinaryFilter{},
-		indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
+	statFilters := []indexer.StatFilter{
 		indexer.SpecialFileFilter{},
 	}
-	_ = filters // XXX
+
+	fileFilters := []indexer.FileFilter{
+		indexer.GitFilter{},
+		indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
+		indexer.BinaryFilter{},
+	}
 
 	root, err := filepath.Abs(flag.Args()[0])
 	if err != nil {
@@ -102,13 +104,31 @@ func main() {
 			return nil
 		}
 
+		for _, filter := range statFilters {
+			drop, err := filter.Filter(info)
+			if err != nil {
+				log.Printf("Couldn't filter %s: %s", path, err)
+				return nil
+			}
+			if drop {
+				skipped++
+				if fVerbose {
+					log.Printf("Filtered %q by %T", info.Name(), filter)
+				}
+				if info.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+		}
+
 		f, err := fs.Open(path)
 		if err != nil {
 			log.Printf("Couldn't open %s: %s", path, err)
 			return nil
 		}
 
-		for _, filter := range filters {
+		for _, filter := range fileFilters {
 			drop, err := filter.Filter(f)
 			if err != nil {
 				log.Printf("Couldn't filter %s: %s", path, err)

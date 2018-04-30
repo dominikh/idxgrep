@@ -65,9 +65,7 @@ func walk(path string, info os.FileInfo, walkFn WalkFunc) error {
 
 	for _, name := range names {
 		filename := stdpath.Join(path, name)
-		// FIXME(dh): the original code uses Lstat, not Stat. We
-		// should, too, to avoid getting stuck in symlink loops.
-		fileInfo, err := Stat(filename)
+		fileInfo, err := Lstat(filename)
 		if err != nil {
 			if err := walkFn(filename, fileInfo, err); err != nil && err != SkipDir {
 				return err
