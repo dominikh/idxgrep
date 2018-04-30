@@ -17,6 +17,7 @@ type Error struct {
 	ResourceID   string `json:"files"`
 	IndexUUID    string `json:"index_uuid"`
 	Index        string `json:"index"`
+	CausedBy     *Error `json:"caused_by"`
 }
 
 type APIError struct {
