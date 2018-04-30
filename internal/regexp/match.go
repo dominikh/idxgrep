@@ -12,6 +12,7 @@ import (
 	"io"
 	"regexp/syntax"
 	"sort"
+	"strings"
 
 	"honnef.co/go/idxgrep/internal/sparse"
 )
@@ -397,7 +398,7 @@ func (g *Grep) Reader(r io.Reader, name string) {
 		endText    = false
 	)
 	if !g.H {
-		prefix = name + ":"
+		prefix = strings.Replace(name, "\x00", " -> ", -1) + ":"
 	}
 	for {
 		if len(buf) == cap(buf) {

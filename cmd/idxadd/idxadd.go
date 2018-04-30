@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/fs"
 	"honnef.co/go/idxgrep/indexer"
 )
 
@@ -37,7 +39,7 @@ func main() {
 	}
 
 	numWorkers := 4
-	ch := make(chan indexer.File)
+	ch := make(chan fs.File)
 	wg := sync.WaitGroup{}
 	wg.Add(numWorkers)
 	indexedTotal := make([]int, numWorkers)
@@ -50,28 +52,23 @@ func main() {
 			indexed := 0
 			skipped := 0
 			for f := range ch {
-				rc, err := f.Open()
+				b, err := ioutil.ReadAll(f)
+				f.Close()
 				if err != nil {
 					skipped++
-					log.Printf("Skipping %q because of read error: %s", f.Path(), err)
-					continue
-				}
-				b, err := ioutil.ReadAll(rc)
-				if err != nil {
-					skipped++
-					log.Printf("Skipping %q because of read error: %s", f.Path(), err)
+					log.Printf("Skipping %q because of read error: %s", f.Name(), err)
 					continue
 				}
 				if fVerbose {
-					log.Printf("Indexing %q", f.Path())
+					log.Printf("Indexing %q", f.Name())
 				}
 				indexed++
 				doc := es.Document{
 					Data: string(b),
-					Name: filepath.Base(f.Path()),
-					Path: filepath.Dir(f.Path()),
+					Name: filepath.Base(f.Name()),
+					Path: filepath.Dir(f.Name()),
 				}
-				id := sha256.Sum256([]byte(f.Path()))
+				id := sha256.Sum256([]byte(f.Name()))
 				if err := bi.Index(doc, hex.EncodeToString(id[:])); err != nil {
 					log.Fatalln("Error indexing files:", err)
 				}
@@ -87,33 +84,56 @@ func main() {
 	indexed := 0
 	skipped := 0
 
-	m := indexer.Master{
-		Processors: []indexer.Processor{
-			indexer.GitProcessor{},
-			indexer.DirectoryProcessor{},
-			indexer.BinaryFilter{},
-			indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
-			indexer.SpecialFileFilter{},
-		},
+	filters := []indexer.Filter{
+		indexer.GitFilter{},
+		indexer.BinaryFilter{},
+		indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
+		indexer.SpecialFileFilter{},
 	}
+	_ = filters // XXX
+
 	root, err := filepath.Abs(flag.Args()[0])
 	if err != nil {
 		log.Fatalln("Couldn't determine absolute path:", err)
 	}
-	cb := func(f indexer.File, err error) {
+	err = fs.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Println("Couldn't process file:", err)
+			log.Printf("Couldn't process %q: %s", path, err)
+			return nil
 		}
-		ch <- f
-	}
-	filtered := func(f indexer.File, proc indexer.Processor) {
-		skipped++
-		if fVerbose {
-			log.Printf("Filtered %q by %T", f.Path(), proc)
+
+		f, err := fs.Open(path)
+		if err != nil {
+			log.Printf("Couldn't open %s: %s", path, err)
+			return nil
 		}
-	}
-	if err := m.Process(indexer.OSFile(root), cb, filtered); err != nil {
-		log.Fatal("Error processing files:", err)
+
+		for _, filter := range filters {
+			drop, err := filter.Filter(f)
+			if err != nil {
+				log.Printf("Couldn't filter %s: %s", path, err)
+				return nil
+			}
+			if drop {
+				skipped++
+				if fVerbose {
+					log.Printf("Filtered %q by %T", f.Name(), filter)
+				}
+				if info.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+		}
+
+		if !info.IsDir() {
+			ch <- f
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Println("Error during file system walk:", err)
 	}
 
 	close(ch)

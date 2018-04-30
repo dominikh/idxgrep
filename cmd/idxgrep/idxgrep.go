@@ -10,6 +10,7 @@ import (
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/fs"
 	"honnef.co/go/idxgrep/internal/parser"
 	"honnef.co/go/idxgrep/internal/regexp"
 )
@@ -52,7 +53,7 @@ func main() {
 	for _, hit := range hits {
 		name := hit.Fields.Name[0]
 		path := filepath.Join(hit.Fields.Path[0], name)
-		f, err := os.Open(path)
+		f, err := fs.Open(path)
 		if err != nil {
 			log.Println(err)
 			continue
