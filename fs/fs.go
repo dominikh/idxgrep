@@ -5,13 +5,17 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"os"
 	stdpath "path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"honnef.co/go/idxgrep/magic"
 )
 
 type opener interface {
@@ -29,11 +33,35 @@ type File interface {
 	Stat() (os.FileInfo, error)
 }
 
+func mimeType(f File) (string, error) {
+	stat, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if stat.IsDir() {
+		return "inode/directory", nil
+	}
+	if seeker, ok := f.(io.Seeker); ok {
+		buf := make([]byte, 512) // TODO(dh): use magic.SniffLen
+		n, _ := io.ReadFull(f, buf)
+		fmime := magic.DetectContentType(buf[:n])
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			return "", err
+		}
+		return fmime, nil
+	}
+	return mime.TypeByExtension(filepath.Ext(f.Name())), nil
+}
+
 func proxy(f File) (File, error) {
 outer:
 	for {
+		fmime, err := mimeType(f)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't determine mime type: %s", err)
+		}
 		for _, proxier := range proxiers {
-			proxied, ok, err := proxier.Proxy(f)
+			proxied, ok, err := proxier.Proxy(f, fmime)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +167,7 @@ func (f *osFile) Name() string     { return f.path }
 func (f *osFile) setName(s string) { f.path = s }
 
 type Proxier interface {
-	Proxy(f File) (File, bool, error)
+	Proxy(f File, mime string) (File, bool, error)
 }
 
 type gzipFile struct {
@@ -175,24 +203,8 @@ func (f *gzipFile) Stat() (os.FileInfo, error) { return f.underlying.Stat() }
 
 type GzipProxy struct{}
 
-func (GzipProxy) Proxy(f File) (File, bool, error) {
-	if _, ok := f.(*gzipFile); ok {
-		// Already a gzip file. Since its name still ends with .gz we
-		// mustn't process it again or we'd get stuck in an infinite
-		// loop.
-		//
-		// TODO(dh): This wouldn't happen if we looked at the file
-		// header. It also prevents us from supporting foo.gz.gz
-		// files.
-		return nil, false, nil
-	}
-
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, false, err
-	}
-	if filepath.Ext(fi.Name()) != ".gz" {
-		// TODO(dh): use magic bytes instead of file extension
+func (GzipProxy) Proxy(f File, mime string) (File, bool, error) {
+	if mime != "application/x-gzip" {
 		return nil, false, nil
 	}
 	r, err := gzip.NewReader(f)
@@ -341,18 +353,12 @@ func (f *zipArchive) Open(path string) (File, error) {
 
 type ZipProxy struct{}
 
-func (ZipProxy) Proxy(f File) (File, bool, error) {
-	if _, ok := f.(*zipArchive); ok {
-		// TODO(dh): same as in GzipProxy
-		return nil, false, nil
-	}
-
+func (ZipProxy) Proxy(f File, mime string) (File, bool, error) {
 	fi, err := f.Stat()
 	if err != nil {
 		return nil, false, err
 	}
-	if filepath.Ext(fi.Name()) != ".zip" {
-		// TODO(dh): use magic bytes instead of file extension
+	if mime != "application/zip" {
 		return nil, false, nil
 	}
 
