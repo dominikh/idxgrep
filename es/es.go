@@ -231,7 +231,6 @@ func (client *Client) DeleteByQuery(q interface{}) (*ByQueryResponse, error) {
 		"query": q,
 	}
 	b, err := json.Marshal(qq)
-	fmt.Println(string(b))
 	if err != nil {
 		return nil, err
 	}
