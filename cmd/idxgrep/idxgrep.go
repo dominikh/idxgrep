@@ -3,9 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp/syntax"
+	"runtime"
+	"sync"
 
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
@@ -15,30 +19,44 @@ import (
 	"honnef.co/go/idxgrep/internal/regexp"
 )
 
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (w *syncWriter) Write(b []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.w.Write(b)
+}
+
 func main() {
 	cfg, err := config.LoadFile(config.DefaultPath)
 	if err != nil {
 		log.Fatalln("Error loading configuration:", err)
 	}
 
-	grep := regexp.Grep{
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
-	grep.AddFlags()
-	insensitive := flag.Bool("i", false, "Case insensitive")
+	var (
+		fi bool
+		fl bool
+		fn bool
+		fh bool
+	)
+	flag.BoolVar(&fi, "i", false, "Case insensitive")
+	flag.BoolVar(&fl, "l", false, "list matching files only")
+	flag.BoolVar(&fn, "n", false, "show line numbers")
+	flag.BoolVar(&fh, "h", false, "omit file names")
 	flag.Parse()
 
 	pat := "(?m)" + flag.Args()[0]
-	if *insensitive {
+	if fi {
 		pat = "(?i)" + pat
 	}
-	re, err := regexp.Compile(pat)
+	re, err := syntax.Parse(pat, syntax.Perl)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Couldn't parse regexp:", err)
 	}
-	q := parser.RegexpQuery(re.Syntax)
-	grep.Regexp = re
+	q := parser.RegexpQuery(re)
 
 	client := es.Client{
 		Base:  cfg.Global.Server,
@@ -50,15 +68,41 @@ func main() {
 		log.Fatal(err)
 	}
 
+	n := runtime.NumCPU()
+	wg := sync.WaitGroup{}
+	wg.Add(n)
+	work := make(chan string, n*2)
+	stdout := &syncWriter{w: os.Stdout}
+	stderr := &syncWriter{w: os.Stderr}
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			re, _ := regexp.Compile(pat)
+			grep := regexp.Grep{
+				Stdout: stdout,
+				Stderr: stderr,
+				Regexp: re,
+				L:      fl,
+				N:      fn,
+				H:      fh,
+			}
+
+			for path := range work {
+				f, err := fs.Open(path)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				grep.Reader(f, path)
+				f.Close()
+			}
+		}()
+	}
 	for _, hit := range hits {
 		name := hit.Fields.Name[0]
 		path := filepath.Join(hit.Fields.Path[0], name)
-		f, err := fs.Open(path)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		grep.Reader(f, path)
-		f.Close()
+		work <- path
 	}
+	close(work)
+	wg.Wait()
 }

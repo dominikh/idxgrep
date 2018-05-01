@@ -7,7 +7,6 @@ package regexp
 import (
 	"bytes"
 	"encoding/binary"
-	"flag"
 	"fmt"
 	"io"
 	"regexp/syntax"
@@ -353,20 +352,12 @@ type Grep struct {
 	Stderr io.Writer // error target
 
 	L bool // L flag - print file names only
-	C bool // C flag - print count of matches
 	N bool // N flag - print line numbers
 	H bool // H flag - do not print file names
 
 	Match bool
 
 	buf []byte
-}
-
-func (g *Grep) AddFlags() {
-	flag.BoolVar(&g.L, "l", false, "list matching files only")
-	flag.BoolVar(&g.C, "c", false, "print match counts only")
-	flag.BoolVar(&g.N, "n", false, "show line numbers")
-	flag.BoolVar(&g.H, "h", false, "omit file names")
 }
 
 var nl = []byte{'\n'}
@@ -392,7 +383,6 @@ func (g *Grep) Reader(r io.Reader, name string) {
 		buf        = g.buf[:0]
 		needLineno = g.N
 		lineno     = 1
-		count      = 0
 		prefix     = ""
 		beginText  = true
 		endText    = false
@@ -436,8 +426,6 @@ func (g *Grep) Reader(r io.Reader, name string) {
 			}
 			line := buf[lineStart:lineEnd]
 			switch {
-			case g.C:
-				count++
 			case g.N:
 				fmt.Fprintf(g.Stdout, "%s%d:%s", prefix, lineno, line)
 			default:
@@ -459,8 +447,5 @@ func (g *Grep) Reader(r io.Reader, name string) {
 			}
 			break
 		}
-	}
-	if g.C && count > 0 {
-		fmt.Fprintf(g.Stdout, "%s: %d\n", name, count)
 	}
 }
