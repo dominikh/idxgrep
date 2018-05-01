@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"honnef.co/go/idxgrep"
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
@@ -78,10 +79,11 @@ func main() {
 		log.Printf("Executing query: %s", q)
 	}
 
-	client := es.Client{
+	client := &es.Client{
 		Base:  cfg.Global.Server,
 		Index: cfg.Global.Index,
 	}
+	idx := idxgrep.Index{Client: client}
 
 	hits, err := client.Search(q)
 	if err != nil {
@@ -112,7 +114,12 @@ func main() {
 				grep.Match = false
 				f, err := fs.Open(path)
 				if err != nil {
-					log.Println(err)
+					if fVerbose {
+						log.Printf("Deleting missing file %q", path)
+					}
+					// OPT(dh): we can evaluate full directory trees
+					// to optimize the cleaning
+					idx.Delete(filepath.Dir(path))
 					continue
 				}
 				grep.Reader(f, path)

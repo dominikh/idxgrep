@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"honnef.co/go/idxgrep"
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
@@ -17,7 +18,7 @@ func main() {
 		log.Fatalln("Error loading configuration:", err)
 	}
 
-	client := es.Client{
+	client := &es.Client{
 		Base:  cfg.Global.Server,
 		Index: cfg.Global.Index,
 	}
@@ -26,13 +27,9 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	q := map[string]interface{}{
-		"term": map[string]interface{}{
-			"path": target,
-		},
-	}
 
-	resp, err := client.DeleteByQuery(q)
+	idx := &idxgrep.Index{Client: client}
+	resp, err := idx.Delete(target)
 	if err != nil {
 		log.Fatalln(err)
 	}
