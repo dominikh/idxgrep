@@ -10,6 +10,7 @@ import (
 	"regexp/syntax"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
@@ -82,6 +83,7 @@ func main() {
 	work := make(chan string, n*2)
 	stdout := &syncWriter{w: os.Stdout}
 	stderr := &syncWriter{w: os.Stderr}
+	var matchedFiles uint64
 	for i := 0; i < n; i++ {
 		go func() {
 			defer wg.Done()
@@ -96,6 +98,7 @@ func main() {
 			}
 
 			for path := range work {
+				grep.Match = false
 				f, err := fs.Open(path)
 				if err != nil {
 					log.Println(err)
@@ -103,6 +106,9 @@ func main() {
 				}
 				grep.Reader(f, path)
 				f.Close()
+				if grep.Match {
+					atomic.AddUint64(&matchedFiles, 1)
+				}
 			}
 		}()
 	}
@@ -116,4 +122,7 @@ func main() {
 	}
 	close(work)
 	wg.Wait()
+	if fVerbose {
+		log.Printf("Found matches in %d files", matchedFiles)
+	}
 }
