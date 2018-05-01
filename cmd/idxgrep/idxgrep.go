@@ -37,15 +37,17 @@ func main() {
 	}
 
 	var (
-		fi bool
-		fl bool
-		fn bool
-		fh bool
+		fi       bool
+		fl       bool
+		fn       bool
+		fh       bool
+		fVerbose bool
 	)
 	flag.BoolVar(&fi, "i", false, "Case insensitive matching")
 	flag.BoolVar(&fl, "l", false, "List matching files only")
 	flag.BoolVar(&fn, "n", false, "Show line numbers")
 	flag.BoolVar(&fh, "h", false, "Omit file names")
+	flag.BoolVar(&fVerbose, "verbose", false, "Verbose output")
 	flag.CommandLine.Init(os.Args[0], flag.ContinueOnError)
 	if err := flag.CommandLine.Parse(os.Args[1:]); err == flag.ErrHelp {
 		os.Exit(2)
@@ -60,6 +62,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Couldn't parse regexp:", err)
 	}
 	q := parser.RegexpQuery(re)
+	if fVerbose {
+		log.Printf("Executing query: %s", q)
+	}
 
 	client := es.Client{
 		Base:  cfg.Global.Server,
@@ -100,6 +105,9 @@ func main() {
 				f.Close()
 			}
 		}()
+	}
+	if fVerbose {
+		log.Printf("Searching through %d candidate files", len(hits))
 	}
 	for _, hit := range hits {
 		name := hit.Fields.Name[0]
