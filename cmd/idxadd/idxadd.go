@@ -91,9 +91,12 @@ func main() {
 	fileFilters := []filter.File{
 		filter.Name{
 			Names: map[string]bool{
-				".git":      true,
-				"__MACOSX":  true,
-				".DS_Store": false,
+				".git":        true,
+				".svn":        true,
+				".sass-cache": true,
+				".yardoc":     true,
+				"__MACOSX":    true,
+				".DS_Store":   false,
 			},
 		},
 		filter.Size{MaxSize: int64(cfg.Indexing.MaxFilesize)},
