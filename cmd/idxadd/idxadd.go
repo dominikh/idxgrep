@@ -137,10 +137,12 @@ func main() {
 		for _, filter := range fileFilters {
 			drop, err := filter.Filter(f)
 			if err != nil {
+				f.Close()
 				log.Printf("Couldn't filter %s: %s", path, err)
 				return nil
 			}
 			if drop {
+				f.Close()
 				skipped++
 				if fVerbose {
 					log.Printf("Filtered %q by %T", f.Name(), filter)
@@ -154,6 +156,8 @@ func main() {
 
 		if !info.IsDir() {
 			ch <- f
+		} else {
+			f.Close()
 		}
 		return nil
 	})
