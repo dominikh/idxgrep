@@ -89,7 +89,13 @@ func main() {
 	}
 
 	fileFilters := []indexer.FileFilter{
-		indexer.GitFilter{},
+		indexer.NameFilter{
+			Names: map[string]bool{
+				".git":      true,
+				"__MACOSX":  true,
+				".DS_Store": false,
+			},
+		},
 		indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
 		indexer.BinaryFilter{},
 	}

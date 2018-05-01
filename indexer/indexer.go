@@ -17,13 +17,20 @@ type FileFilter interface {
 	Filter(fs.File) (drop bool, err error)
 }
 
-type GitFilter struct{}
+type NameFilter struct {
+	// Names to filter. The boolean specifies whether the file entry
+	// has to be a directory.
+	Names map[string]bool
+}
 
-func (GitFilter) Filter(f fs.File) (drop bool, err error) {
-	// TODO(dh): for now we simply filter .git directories. In the
-	// future, we should index individual commits.
-	if filepath.Base(f.Name()) != ".git" {
+func (nf NameFilter) Filter(f fs.File) (drop bool, err error) {
+	base := filepath.Base(f.Name())
+	mustDir, ok := nf.Names[base]
+	if !ok {
 		return false, nil
+	}
+	if !mustDir {
+		return true, nil
 	}
 	fi, err := f.Stat()
 	if err != nil {
