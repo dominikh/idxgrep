@@ -334,8 +334,7 @@ func (f *zipArchive) Open(path string) (File, error) {
 			return &zipFile{path: stdpath.Join(f.path, path), ReadCloser: r, f: zf, zip: f.r}, nil
 		}
 	}
-	// XXX return an error that os.IsNotFound understands
-	return nil, errors.New("file not found")
+	return nil, os.ErrNotExist
 }
 
 type ZipProxy struct{}
