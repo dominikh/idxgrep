@@ -42,11 +42,14 @@ func main() {
 		fn bool
 		fh bool
 	)
-	flag.BoolVar(&fi, "i", false, "Case insensitive")
-	flag.BoolVar(&fl, "l", false, "list matching files only")
-	flag.BoolVar(&fn, "n", false, "show line numbers")
-	flag.BoolVar(&fh, "h", false, "omit file names")
-	flag.Parse()
+	flag.BoolVar(&fi, "i", false, "Case insensitive matching")
+	flag.BoolVar(&fl, "l", false, "List matching files only")
+	flag.BoolVar(&fn, "n", false, "Show line numbers")
+	flag.BoolVar(&fh, "h", false, "Omit file names")
+	flag.CommandLine.Init(os.Args[0], flag.ContinueOnError)
+	if err := flag.CommandLine.Parse(os.Args[1:]); err == flag.ErrHelp {
+		os.Exit(2)
+	}
 
 	pat := "(?m)" + flag.Args()[0]
 	if fi {
