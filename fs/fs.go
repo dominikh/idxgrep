@@ -248,7 +248,11 @@ func (f *zipFile) Readdirnames(count int) ([]string, error) {
 	cnt := strings.Count(f.f.Name, "/")
 	var out []string
 	for _, zf := range f.zip.File {
-		if len(zf.Name) > len(f.f.Name) && strings.HasPrefix(zf.Name, f.f.Name) && strings.Count(zf.Name, "/") == cnt {
+		if len(zf.Name) > len(f.f.Name) &&
+			strings.HasPrefix(zf.Name, f.f.Name) &&
+			(strings.Count(zf.Name, "/") == cnt ||
+				(strings.Count(zf.Name, "/") == cnt+1 && zf.FileInfo().IsDir())) {
+
 			out = append(out, zf.FileInfo().Name())
 		}
 	}
@@ -276,25 +280,6 @@ func (f *zipArchive) Read(b []byte) (int, error) { return 0, io.EOF }
 
 func (f *zipArchive) Readdir(count int) ([]os.FileInfo, error) {
 	panic("not implemented")
-	var out []os.FileInfo
-loop:
-	for _, zf := range f.r.File {
-		if count > 0 && len(out) == count {
-			break
-		}
-		switch strings.Count(zf.Name, "/") {
-		case 0:
-		case 1:
-			if !zf.Mode().IsDir() {
-				continue loop
-			}
-		default:
-			continue loop
-		}
-		// XXX prepend NUL
-		out = append(out, zf.FileInfo())
-	}
-	return out, nil
 }
 
 func (f *zipArchive) Readdirnames(count int) ([]string, error) {
