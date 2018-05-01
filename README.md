@@ -21,6 +21,37 @@ is clunky, the index format will change.
 go get -u honnef.co/go/idxgrep/cmd/...
 ```
 
+## Features
+
+### File type support
+
+Idxgrep tries to transparently index files within files, such as files
+in ZIP archives or revisions in version control. When possible, it
+does this recursively, such as a ZIP inside another ZIP, or a zipped
+repository (though this depends on the specific file types).
+
+Currently supported file types include:
+
+- ZIP
+- tar
+
+### Ignoring files
+
+Files can be omitted from the index based on the following filters:
+
+- Maximum file size
+- Not being binary data
+- Not being special files (such as named pipes or block devices)
+- Not having certain names (for example `__MACOSX`)
+
+### Planned features
+
+These features aren't implemented yet but will be in the future:
+
+- Support for non-local files. http://, git://, possibly others?
+- Indexing revisions in version control systems (git, possibly others?)
+- A daemon that watches for file changes and automatically updates the index
+
 ## Usage
 
 There are three basic commands for using idxgrep: `idxgrep`, `idxadd`
