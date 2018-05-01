@@ -76,11 +76,13 @@ outer:
 
 func Lstat(path string) (os.FileInfo, error) {
 	if !strings.Contains(path, "\x00") {
-		// TODO(dh): this isn't technically correct because of
-		// information like file size that may be changed by
-		// transparent decompression. but for current consumers, this
-		// should be fine.
-		return os.Lstat(path)
+		fi, err := os.Lstat(path)
+		if err != nil {
+			return nil, err
+		}
+		if (fi.Mode() & os.ModeType) != 0 {
+			return fi, nil
+		}
 	}
 	f, err := Open(path)
 	if err != nil {
