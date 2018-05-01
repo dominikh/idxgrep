@@ -32,10 +32,11 @@ func (w *syncWriter) Write(b []byte) (int, error) {
 }
 
 func main() {
-	cfg, err := config.LoadFile(config.DefaultPath)
-	if err != nil {
-		log.Fatalln("Error loading configuration:", err)
+	usage := func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [OPTION]... PATTERN\n", os.Args[0])
+		flag.PrintDefaults()
 	}
+	flag.CommandLine.Usage = usage
 
 	var (
 		fi       bool
@@ -52,6 +53,16 @@ func main() {
 	flag.CommandLine.Init(os.Args[0], flag.ContinueOnError)
 	if err := flag.CommandLine.Parse(os.Args[1:]); err == flag.ErrHelp {
 		os.Exit(2)
+	}
+
+	if flag.NArg() != 1 {
+		flag.CommandLine.Usage()
+		os.Exit(2)
+	}
+
+	cfg, err := config.LoadFile(config.DefaultPath)
+	if err != nil {
+		log.Fatalln("Error loading configuration:", err)
 	}
 
 	pat := "(?m)" + flag.Args()[0]
