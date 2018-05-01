@@ -14,8 +14,8 @@ import (
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/filter"
 	"honnef.co/go/idxgrep/fs"
-	"honnef.co/go/idxgrep/indexer"
 )
 
 func main() {
@@ -84,20 +84,20 @@ func main() {
 	indexed := 0
 	skipped := 0
 
-	statFilters := []indexer.StatFilter{
-		indexer.SpecialFileFilter{},
+	statFilters := []filter.Stat{
+		filter.SpecialFile{},
 	}
 
-	fileFilters := []indexer.FileFilter{
-		indexer.NameFilter{
+	fileFilters := []filter.File{
+		filter.Name{
 			Names: map[string]bool{
 				".git":      true,
 				"__MACOSX":  true,
 				".DS_Store": false,
 			},
 		},
-		indexer.SizeFilter{MaxSize: int64(cfg.Indexing.MaxFilesize)},
-		indexer.BinaryFilter{},
+		filter.Size{MaxSize: int64(cfg.Indexing.MaxFilesize)},
+		filter.Binary{},
 	}
 
 	root, err := filepath.Abs(flag.Args()[0])

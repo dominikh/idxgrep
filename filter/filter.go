@@ -1,4 +1,4 @@
-package indexer
+package filter
 
 import (
 	"io"
@@ -9,21 +9,21 @@ import (
 	"honnef.co/go/idxgrep/fs"
 )
 
-type StatFilter interface {
+type Stat interface {
 	Filter(os.FileInfo) (drop bool, err error)
 }
 
-type FileFilter interface {
+type File interface {
 	Filter(fs.File) (drop bool, err error)
 }
 
-type NameFilter struct {
+type Name struct {
 	// Names to filter. The boolean specifies whether the file entry
 	// has to be a directory.
 	Names map[string]bool
 }
 
-func (nf NameFilter) Filter(f fs.File) (drop bool, err error) {
+func (nf Name) Filter(f fs.File) (drop bool, err error) {
 	base := filepath.Base(f.Name())
 	mustDir, ok := nf.Names[base]
 	if !ok {
@@ -39,9 +39,9 @@ func (nf NameFilter) Filter(f fs.File) (drop bool, err error) {
 	return fi.IsDir(), nil
 }
 
-type BinaryFilter struct{}
+type Binary struct{}
 
-func (BinaryFilter) Filter(f fs.File) (drop bool, err error) {
+func (Binary) Filter(f fs.File) (drop bool, err error) {
 	fi, err := f.Stat()
 	if err != nil {
 		return false, err
@@ -70,11 +70,11 @@ func (BinaryFilter) Filter(f fs.File) (drop bool, err error) {
 	return classify.IsBinary(b[:n]), nil
 }
 
-type SizeFilter struct {
+type Size struct {
 	MaxSize int64
 }
 
-func (filter SizeFilter) Filter(f fs.File) (drop bool, err error) {
+func (filter Size) Filter(f fs.File) (drop bool, err error) {
 	fi, err := f.Stat()
 	if err != nil {
 		return false, err
@@ -85,9 +85,9 @@ func (filter SizeFilter) Filter(f fs.File) (drop bool, err error) {
 	return false, nil
 }
 
-type SpecialFileFilter struct{}
+type SpecialFile struct{}
 
-func (SpecialFileFilter) Filter(fi os.FileInfo) (drop bool, err error) {
+func (SpecialFile) Filter(fi os.FileInfo) (drop bool, err error) {
 	if fi.IsDir() {
 		return false, nil
 	}
