@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
@@ -21,8 +22,10 @@ func main() {
 		Index: cfg.Global.Index,
 	}
 
-	target := os.Args[1]
-
+	target, err := filepath.Abs(os.Args[1])
+	if err != nil {
+		log.Fatalln(err)
+	}
 	q := map[string]interface{}{
 		"term": map[string]interface{}{
 			"path": target,
