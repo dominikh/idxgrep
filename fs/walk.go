@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	stdpath "path"
-	"sort"
 )
 
 // SkipDir is used as a return value from WalkFuncs to indicate that
@@ -28,8 +27,6 @@ var SkipDir = errors.New("skip this directory")
 // Walk skips the remaining files in the containing directory.
 type WalkFunc func(path string, info os.FileInfo, err error) error
 
-// readDirNames reads the directory named by dirname and returns
-// a sorted list of directory entries.
 func readDirNames(dirname string) ([]string, error) {
 	f, err := Open(dirname)
 	if err != nil {
@@ -40,7 +37,6 @@ func readDirNames(dirname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Strings(names)
 	return names, nil
 }
 
@@ -84,9 +80,7 @@ func walk(path string, info os.FileInfo, walkFn WalkFunc) error {
 
 // Walk walks the file tree rooted at root, calling walkFn for each file or
 // directory in the tree, including root. All errors that arise visiting files
-// and directories are filtered by walkFn. The files are walked in lexical
-// order, which makes the output deterministic but means that for very
-// large directories Walk can be inefficient.
+// and directories are filtered by walkFn.
 // Walk does not follow symbolic links.
 func Walk(root string, walkFn WalkFunc) error {
 	info, err := os.Lstat(root)
