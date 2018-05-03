@@ -19,25 +19,25 @@ var DefaultPath = filepath.Join(configdir.LocalConfig("idxgrep"), "idxgrep.conf"
 var DefaultConfig = Config{
 	Global: Global{
 		Server: "http://localhost:9200",
-		Index:  "files",
 	},
-	Indexing: Indexing{
+	RegexpIndex: RegexpIndex{
+		Index:       "files",
 		MaxFilesize: 10485760,
 	},
 }
 
 type Config struct {
-	Global   Global   `toml:"global"`
-	Indexing Indexing `toml:"indexing"`
+	Global      Global      `toml:"global"`
+	RegexpIndex RegexpIndex `toml:"regexp_index"`
 }
 
 type Global struct {
 	Server string `toml:"server"`
-	Index  string `toml:"index"`
 }
 
-type Indexing struct {
-	MaxFilesize int `toml:"max_filesize"`
+type RegexpIndex struct {
+	Index       string `toml:"index"`
+	MaxFilesize int    `toml:"max_filesize"`
 }
 
 func Load(r io.Reader) (*Config, error) {

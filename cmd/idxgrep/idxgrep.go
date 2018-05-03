@@ -81,7 +81,7 @@ func main() {
 
 	client := &es.Client{
 		Base:  cfg.Global.Server,
-		Index: cfg.Global.Index,
+		Index: cfg.RegexpIndex.Index,
 	}
 	idx := idxgrep.Index{Client: client}
 

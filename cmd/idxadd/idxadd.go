@@ -32,7 +32,7 @@ func main() {
 	}
 	client := &es.Client{
 		Base:  cfg.Global.Server,
-		Index: cfg.Global.Index,
+		Index: cfg.RegexpIndex.Index,
 	}
 	idx := esregexp.Index{Client: client}
 	t := time.Now()
@@ -101,7 +101,7 @@ func main() {
 				".DS_Store":   false,
 			},
 		},
-		filter.Size{MaxSize: int64(cfg.Indexing.MaxFilesize)},
+		filter.Size{MaxSize: int64(cfg.RegexpIndex.MaxFilesize)},
 		filter.Binary{},
 	}
 

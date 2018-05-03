@@ -20,7 +20,7 @@ func main() {
 
 	client := &es.Client{
 		Base:  cfg.Global.Server,
-		Index: cfg.Global.Index,
+		Index: cfg.RegexpIndex.Index,
 	}
 
 	target, err := filepath.Abs(os.Args[1])
