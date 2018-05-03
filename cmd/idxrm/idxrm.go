@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"honnef.co/go/idxgrep"
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/index/regexp"
 	"honnef.co/go/spew"
 )
 
@@ -28,7 +28,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	idx := &idxgrep.Index{Client: client}
+	idx := &regexp.Index{Client: client}
 	resp, err := idx.Delete(target)
 	if err != nil {
 		log.Fatalln(err)

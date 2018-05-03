@@ -1,4 +1,4 @@
-package esregexp
+package regexp
 
 import (
 	"net/http"
@@ -7,8 +7,25 @@ import (
 	"honnef.co/go/idxgrep/es"
 )
 
+type Document struct {
+	Data string `json:"data"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
 type Index struct {
 	Client *es.Client
+}
+
+func (idx *Index) Delete(path string) (*es.ByQueryResponse, error) {
+	path = strings.Replace(path, "\x00", "", -1)
+	q := map[string]interface{}{
+		"term": map[string]interface{}{
+			"path": path,
+		},
+	}
+
+	return idx.Client.DeleteByQuery(q)
 }
 
 func (idx *Index) CreateIndex() error {
@@ -94,10 +111,4 @@ func (idx *Index) CreateIndex() error {
 	}
 	defer resp.Body.Close()
 	return nil
-}
-
-type Document struct {
-	Data string `json:"data"`
-	Name string `json:"name"`
-	Path string `json:"path"`
 }

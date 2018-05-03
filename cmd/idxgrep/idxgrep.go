@@ -12,11 +12,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"honnef.co/go/idxgrep"
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
 	"honnef.co/go/idxgrep/fs"
+	idxregexp "honnef.co/go/idxgrep/index/regexp"
 	"honnef.co/go/idxgrep/internal/parser"
 	"honnef.co/go/idxgrep/internal/regexp"
 )
@@ -83,7 +83,7 @@ func main() {
 		Base:  cfg.Global.Server,
 		Index: cfg.RegexpIndex.Index,
 	}
-	idx := idxgrep.Index{Client: client}
+	idx := idxregexp.Index{Client: client}
 
 	hits, err := client.Search(q)
 	if err != nil {
