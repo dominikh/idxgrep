@@ -103,7 +103,7 @@ func (client *Client) Search(q *parser.Query) ([]SearchHit, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		if err, ok := err.(APIError); ok {
 			if err.Err.Type == "index_not_found_exception" {

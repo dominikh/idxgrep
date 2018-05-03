@@ -29,7 +29,7 @@ func (bi *BulkIndexer) reset() error {
 	bi.size = 0
 
 	go func() {
-		resp, err := bi.client.do(req)
+		resp, err := bi.client.Do(req)
 		if err != nil {
 			done <- err
 			return

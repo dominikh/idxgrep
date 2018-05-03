@@ -14,6 +14,7 @@ import (
 	_ "honnef.co/go/idxgrep/cmd"
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
+	"honnef.co/go/idxgrep/es/esregexp"
 	"honnef.co/go/idxgrep/filter"
 	"honnef.co/go/idxgrep/fs"
 )
@@ -29,12 +30,13 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error loading configuration:", err)
 	}
-	client := es.Client{
+	client := &es.Client{
 		Base:  cfg.Global.Server,
 		Index: cfg.Global.Index,
 	}
+	idx := esregexp.Index{Client: client}
 	t := time.Now()
-	if err := client.CreateIndex(); err != nil {
+	if err := idx.CreateIndex(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -63,7 +65,7 @@ func main() {
 					log.Printf("Indexing %q", f.Name())
 				}
 				indexed++
-				doc := es.Document{
+				doc := esregexp.Document{
 					Data: string(b),
 					Name: filepath.Base(f.Name()),
 					Path: filepath.Dir(f.Name()),
