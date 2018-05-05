@@ -19,10 +19,10 @@ func (bi *BulkIndexer) reset() error {
 	pr, pw := io.Pipe()
 	done := make(chan error, 1)
 	req, err := http.NewRequest("POST", bi.url, pr)
-	req.Header.Set("Content-Type", "application/x-ndjson")
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/x-ndjson")
 
 	bi.w = pw
 	bi.done = done
