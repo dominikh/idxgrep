@@ -2,6 +2,7 @@ package es
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 )
@@ -13,6 +14,12 @@ type BulkIndexer struct {
 	size   int
 
 	url string
+}
+
+type bulkResult struct {
+	Errors bool
+	// TODO(dh): store the items. each item may have different fields,
+	// depending on the op.
 }
 
 func (bi *BulkIndexer) reset() error {
@@ -35,6 +42,15 @@ func (bi *BulkIndexer) reset() error {
 			return
 		}
 		defer resp.Body.Close()
+		var res bulkResult
+		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+			done <- err
+			return
+		}
+		if res.Errors {
+			done <- errors.New("bulk insert encountered error")
+			return
+		}
 		close(done)
 	}()
 
