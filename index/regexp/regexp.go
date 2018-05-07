@@ -15,6 +15,7 @@ import (
 	"honnef.co/go/idxgrep/es"
 	"honnef.co/go/idxgrep/filter"
 	"honnef.co/go/idxgrep/fs"
+	"honnef.co/go/idxgrep/index"
 )
 
 var Verbose = false
@@ -126,12 +127,7 @@ func (idx *Index) CreateIndex() error {
 	return nil
 }
 
-type Statistics struct {
-	Indexed int
-	Skipped int
-}
-
-func (idx *Index) Index(root string) (Statistics, error) {
+func (idx *Index) Index(root string) (index.Statistics, error) {
 	numWorkers := 4
 	errCh := make(chan error, numWorkers)
 	workCh := make(chan fs.File)
@@ -170,6 +166,7 @@ func (idx *Index) Index(root string) (Statistics, error) {
 					return
 				}
 			}
+			// XXX ensure bi is always closed
 			if err := bi.Close(); err != nil {
 				errCh <- err
 				return
@@ -267,7 +264,7 @@ func (idx *Index) Index(root string) (Statistics, error) {
 	wg.Wait()
 
 	if err != nil {
-		return Statistics{}, err
+		return index.Statistics{}, err
 	}
 
 	for _, count := range indexedTotal {
@@ -276,5 +273,5 @@ func (idx *Index) Index(root string) (Statistics, error) {
 	for _, count := range skippedTotal {
 		skipped += count
 	}
-	return Statistics{Indexed: indexed, Skipped: skipped}, nil
+	return index.Statistics{Indexed: indexed, Skipped: skipped}, nil
 }

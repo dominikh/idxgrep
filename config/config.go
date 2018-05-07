@@ -29,6 +29,7 @@ var DefaultConfig = Config{
 type Config struct {
 	Global      Global      `toml:"global"`
 	RegexpIndex RegexpIndex `toml:"regexp_index"`
+	ChatIndex   ChatIndex   `toml:"chat_index"`
 }
 
 type Global struct {
@@ -38,6 +39,10 @@ type Global struct {
 type RegexpIndex struct {
 	Index       string `toml:"index"`
 	MaxFilesize int    `toml:"max_filesize"`
+}
+
+type ChatIndex struct {
+	Index string `toml:"index"`
 }
 
 func Load(r io.Reader) (*Config, error) {
