@@ -3,6 +3,7 @@ package regexp
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"honnef.co/go/idxgrep/filter"
 	"honnef.co/go/idxgrep/fs"
 	"honnef.co/go/idxgrep/index"
+	"honnef.co/go/idxgrep/internal/parser"
 )
 
 var Verbose = false
@@ -274,4 +276,67 @@ func (idx *Index) Index(root string) (index.Statistics, error) {
 		skipped += count
 	}
 	return index.Statistics{Indexed: indexed, Skipped: skipped}, nil
+}
+
+func queryToES(q *parser.Query) interface{} {
+	out := es.BoolQuery{}
+	switch q.Op {
+	case parser.QAll:
+		return map[string]interface{}{"match_all": struct{}{}}
+	case parser.QNone:
+		return map[string]interface{}{"match_none": struct{}{}}
+	case parser.QAnd:
+		for _, tri := range q.Trigram {
+			out.And = append(out.And, es.Term{Key: "data", Value: tri})
+		}
+		for _, sq := range q.Sub {
+			out.And = append(out.And, queryToES(sq))
+		}
+	case parser.QOr:
+		for _, tri := range q.Trigram {
+			out.Or = append(out.Or, es.Term{Key: "data", Value: tri})
+		}
+		for _, sq := range q.Sub {
+			out.Or = append(out.Or, queryToES(sq))
+		}
+	}
+	if len(out.Or) > 0 {
+		out.MinimumOr = 1
+	}
+	return out
+}
+
+type SearchHit struct {
+	ID   string
+	Name string
+	Path string
+}
+
+func (idx *Index) Search(q *parser.Query) ([]SearchHit, error) {
+	s := es.Search{
+		Query:  queryToES(q),
+		Fields: []string{"name", "path"},
+	}
+	hits, err := idx.Client.Search(s)
+	if err != nil {
+		return nil, err
+	}
+
+	type fields struct {
+		Name []string `json:"name"`
+		Path []string `json:"path"`
+	}
+	out := make([]SearchHit, len(hits))
+	for i, hit := range hits {
+		var f fields
+		if err := json.Unmarshal(hit.Fields, &f); err != nil {
+			return nil, err
+		}
+		out[i] = SearchHit{
+			ID:   hit.ID,
+			Name: f.Name[0],
+			Path: f.Path[0],
+		}
+	}
+	return out, nil
 }

@@ -3,23 +3,22 @@ package es
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
-
-	"honnef.co/go/idxgrep/internal/parser"
 )
 
-type search struct {
+type Search struct {
 	Query  interface{} `json:"query"`
 	Fields []string    `json:"stored_fields,omitempty"`
 }
 
-type boolQuery struct {
+type BoolQuery struct {
 	And       []interface{}
 	Or        []interface{}
 	MinimumOr int
 }
 
-func (q boolQuery) MarshalJSON() ([]byte, error) {
+func (q BoolQuery) MarshalJSON() ([]byte, error) {
 	qq := struct {
 		And       []interface{} `json:"must,omitempty"`
 		Or        []interface{} `json:"should,omitempty"`
@@ -31,25 +30,34 @@ func (q boolQuery) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v)
 }
 
-type term string
+type Term struct {
+	Key   string
+	Value interface{}
+	Boost float64
+}
 
-func (t term) MarshalJSON() ([]byte, error) {
-	type typ struct {
-		Term struct {
-			Data string `json:"data"`
-		} `json:"term"`
+func (t Term) MarshalJSON() ([]byte, error) {
+	type value struct {
+		Value interface{} `json:"value"`
+		Boost float64     `json:"boost,omitempty"`
 	}
-	d := typ{}
-	d.Term.Data = string(t)
-	return json.Marshal(d)
+
+	v := struct {
+		Term map[string]value `json:"term"`
+	}{
+		map[string]value{t.Key: value{t.Value, t.Boost}},
+	}
+
+	return json.Marshal(v)
 }
 
 type SearchHit struct {
-	ID     string `json:"_id"`
-	Fields struct {
-		Name []string `json:"name"`
-		Path []string `json:"path"`
-	}
+	Index  string          `json:"_index"`
+	Type   string          `json:"_type"`
+	ID     string          `json:"_id"`
+	Score  float64         `json:"_score"`
+	Source json.RawMessage `json:"_source"`
+	Fields json.RawMessage `json:"fields"`
 }
 
 type searchHits struct {
@@ -60,45 +68,13 @@ type searchResult struct {
 	Hits searchHits `json:"hits"`
 }
 
-func queryToES(q *parser.Query) interface{} {
-	out := boolQuery{}
-	switch q.Op {
-	case parser.QAll:
-		return map[string]interface{}{"match_all": struct{}{}}
-	case parser.QNone:
-		return map[string]interface{}{"match_none": struct{}{}}
-	case parser.QAnd:
-		for _, tri := range q.Trigram {
-			out.And = append(out.And, term(tri))
-		}
-		for _, sq := range q.Sub {
-			out.And = append(out.And, queryToES(sq))
-		}
-	case parser.QOr:
-		for _, tri := range q.Trigram {
-			out.Or = append(out.Or, term(tri))
-		}
-		for _, sq := range q.Sub {
-			out.Or = append(out.Or, queryToES(sq))
-		}
-	}
-	if len(out.Or) > 0 {
-		out.MinimumOr = 1
-	}
-	return out
-}
-
-func (client *Client) Search(q *parser.Query) ([]SearchHit, error) {
-	s := search{
-		Query:  queryToES(q),
-		Fields: []string{"name", "path"},
-	}
+func (client *Client) Search(s Search) ([]SearchHit, error) {
 	b, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", client.Base+"/files/_search?size=10000", bytes.NewReader(b))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/_search?size=10000", client.Base, client.Index), bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
