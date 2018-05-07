@@ -72,7 +72,22 @@ func (idx *Index) CreateIndex() error {
     {
       "settings": {
         "number_of_shards": 1,
-        "number_of_replicas": 0
+        "number_of_replicas": 0,
+        "analysis": {
+          "char_filter": {
+            "username": {
+              "type": "pattern_replace",
+              "pattern": "^[+%@]?(.+)$",
+              "replacement": "$1"
+            }
+          },
+          "normalizer": {
+            "username": {
+              "type": "custom",
+              "char_filter": ["username"]
+            }
+          }
+        }
       },
       "mappings": {
         "_doc": {
@@ -91,10 +106,22 @@ func (idx *Index) CreateIndex() error {
               "format": "epoch_millis"
             },
             "from": {
-              "type": "keyword"
+              "type": "keyword",
+              "normalizer": "username",
+              "fields": {
+                "raw": {
+                  "type": "keyword"
+                }
+              }
             },
             "to": {
-              "type": "keyword"
+              "type": "keyword",
+              "normalizer": "username",
+              "fields": {
+                "raw": {
+                  "type": "keyword"
+                }
+              }
             },
             "message": {
               "type": "text",
@@ -208,7 +235,6 @@ func (w *Weechat) Index(root string) (index.Statistics, error) {
 					stats.Skipped++
 					continue fileLoop
 				}
-				// TODO(dh): strip IRC prefix
 				from := fields[1]
 				switch from {
 				case "--", "<--", "-->", "←", "→", "":
