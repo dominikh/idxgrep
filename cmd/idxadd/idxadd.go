@@ -20,7 +20,7 @@ func main() {
 		fIndex   string
 	)
 
-	flag.StringVar(&fIndex, "i", "grep", "Index type")
+	flag.StringVar(&fIndex, "i", "regexp", "Index type")
 	flag.BoolVar(&fVerbose, "v", false, "Verbose output")
 	flag.Parse()
 	regexp.Verbose = fVerbose
