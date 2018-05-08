@@ -3,6 +3,7 @@ package chat
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"path"
@@ -62,6 +63,17 @@ func (m *Message) UnmarshalJSON(b []byte) error {
 	m.To = msg.To
 	m.Message = msg.Message
 	return nil
+}
+
+func (m Message) String() string {
+	return fmt.Sprintf("%s://%s/%s %s <%s> %s",
+		m.Protocol,
+		m.Server,
+		m.ChannelOrPerson,
+		m.Time,
+		m.From,
+		m.Message,
+	)
 }
 
 type Index struct {
@@ -151,6 +163,20 @@ func (idx *Index) CreateIndex() error {
 	}
 	defer resp.Body.Close()
 	return nil
+}
+
+func (idx *Index) Search(s es.Search, count int) ([]Message, error) {
+	hits, err := idx.Client.Search(s, count)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Message, len(hits))
+	for i, hit := range hits {
+		if err := json.Unmarshal(hit.Source, &out[i]); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 type Weechat struct {

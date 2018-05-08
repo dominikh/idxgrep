@@ -312,12 +312,12 @@ type SearchHit struct {
 	Path string
 }
 
-func (idx *Index) Search(q *parser.Query) ([]SearchHit, error) {
+func (idx *Index) Search(q *parser.Query, count int) ([]SearchHit, error) {
 	s := es.Search{
 		Query:  queryToES(q),
 		Fields: []string{"name", "path"},
 	}
-	hits, err := idx.Client.Search(s)
+	hits, err := idx.Client.Search(s, count)
 	if err != nil {
 		return nil, err
 	}

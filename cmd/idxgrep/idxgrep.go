@@ -17,6 +17,7 @@ import (
 	"honnef.co/go/idxgrep/config"
 	"honnef.co/go/idxgrep/es"
 	"honnef.co/go/idxgrep/fs"
+	"honnef.co/go/idxgrep/index/chat"
 	idxregexp "honnef.co/go/idxgrep/index/regexp"
 	"honnef.co/go/idxgrep/internal/parser"
 	"honnef.co/go/idxgrep/internal/regexp"
@@ -33,8 +34,8 @@ func (w *syncWriter) Write(b []byte) (int, error) {
 	return w.w.Write(b)
 }
 
-func queryRegexp(cfg *config.Config, opts regexOptions, verbose bool) {
-	pat := "(?m)" + flag.Args()[0]
+func queryRegexp(cfg *config.Config, opts regexOptions) {
+	pat := "(?m)" + opts.message
 	if opts.caseInsensitive {
 		pat = "(?i)" + pat
 	}
@@ -43,7 +44,7 @@ func queryRegexp(cfg *config.Config, opts regexOptions, verbose bool) {
 		fmt.Fprintln(os.Stderr, "Couldn't parse regexp:", err)
 	}
 	q := parser.RegexpQuery(re)
-	if verbose {
+	if opts.verbose {
 		log.Printf("Executing query: %s", q)
 	}
 
@@ -53,7 +54,7 @@ func queryRegexp(cfg *config.Config, opts regexOptions, verbose bool) {
 	}
 	idx := idxregexp.Index{Client: client}
 
-	hits, err := idx.Search(q)
+	hits, err := idx.Search(q, opts.count)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func queryRegexp(cfg *config.Config, opts regexOptions, verbose bool) {
 				grep.Match = false
 				f, err := fs.Open(path)
 				if err != nil {
-					if verbose {
+					if opts.verbose {
 						log.Printf("Deleting missing file %q", path)
 					}
 					// OPT(dh): we can evaluate full directory trees
@@ -98,7 +99,7 @@ func queryRegexp(cfg *config.Config, opts regexOptions, verbose bool) {
 			}
 		}()
 	}
-	if verbose {
+	if opts.verbose {
 		log.Printf("Searching through %d candidate files", len(hits))
 	}
 	for _, hit := range hits {
@@ -108,12 +109,53 @@ func queryRegexp(cfg *config.Config, opts regexOptions, verbose bool) {
 	}
 	close(work)
 	wg.Wait()
-	if verbose {
+	if opts.verbose {
 		log.Printf("Found matches in %d files", matchedFiles)
 	}
 }
 
+func queryChat(cfg *config.Config, opts chatOptions) {
+	client := &es.Client{
+		Base:  cfg.Global.Server,
+		Index: cfg.ChatIndex.Index,
+	}
+	idx := &chat.Index{Client: client}
+	q := es.BoolQuery{}
+	if opts.channel != "" {
+		q.And = append(q.And, es.Match{Key: "channel_or_person", Value: opts.channel})
+	}
+	if opts.from != "" {
+		q.And = append(q.And, es.Match{Key: "from", Value: opts.from})
+	}
+	if opts.protocol != "" {
+		q.And = append(q.And, es.Match{Key: "protocol", Value: opts.protocol})
+	}
+	if opts.server != "" {
+		q.And = append(q.And, es.Match{Key: "server", Value: opts.server})
+	}
+	if opts.message != "" {
+		q.And = append(q.And, es.Match{Key: "message", Value: opts.message})
+	}
+
+	s := es.Search{Query: q}
+	msgs, err := idx.Search(s, opts.count)
+	if err != nil {
+		panic(err)
+	}
+	for _, msg := range msgs {
+		fmt.Println(msg)
+	}
+}
+
+type generalOptions struct {
+	verbose bool
+	message string
+	count   int
+}
+
 type regexOptions struct {
+	*generalOptions
+
 	caseInsensitive bool
 	listOnly        bool
 	showLines       bool
@@ -121,15 +163,21 @@ type regexOptions struct {
 }
 
 type chatOptions struct {
-	from string
-	to   string
+	*generalOptions
+
+	from     string
+	to       string
+	protocol string
+	server   string
+	channel  string
 }
 
 type queryMode struct {
 	mode string
 
-	regex regexOptions
-	chat  chatOptions
+	general generalOptions
+	regex   regexOptions
+	chat    chatOptions
 }
 
 func (m *queryMode) String() string { return m.mode }
@@ -142,6 +190,9 @@ func (m *queryMode) Set(s string) error {
 		flag.BoolVar(&m.regex.omitNames, "q.h", false, "Omit file names")
 	case "chat":
 		flag.StringVar(&m.chat.from, "q.from", "", "")
+		flag.StringVar(&m.chat.protocol, "q.protocol", "", "")
+		flag.StringVar(&m.chat.server, "q.server", "", "")
+		flag.StringVar(&m.chat.channel, "q.channel", "", "")
 	default:
 		return errors.New("unknown query mode")
 	}
@@ -156,18 +207,24 @@ func main() {
 	}
 	flag.CommandLine.Usage = usage
 
-	var fVerbose bool
 	var qm queryMode
+	qm.regex.generalOptions = &qm.general
+	qm.chat.generalOptions = &qm.general
 	flag.Var(&qm, "q", "")
-	flag.BoolVar(&fVerbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&qm.general.verbose, "v", false, "Verbose output")
+	flag.IntVar(&qm.general.count, "n", 10, "Max number of results")
 	flag.CommandLine.Init(os.Args[0], flag.ContinueOnError)
 	if err := flag.CommandLine.Parse(os.Args[1:]); err == flag.ErrHelp {
 		os.Exit(2)
 	}
 
-	if flag.NArg() != 1 {
+	if flag.NArg() > 1 {
 		flag.CommandLine.Usage()
 		os.Exit(2)
+	}
+
+	if flag.NArg() > 0 {
+		qm.general.message = flag.Arg(0)
 	}
 
 	cfg, err := config.LoadFile(config.DefaultPath)
@@ -177,9 +234,9 @@ func main() {
 
 	switch qm.mode {
 	case "regexp":
-		queryRegexp(cfg, qm.regex, fVerbose)
+		queryRegexp(cfg, qm.regex)
 	case "chat":
-		panic("not implemented")
+		queryChat(cfg, qm.chat)
 	default:
 		os.Exit(2)
 	}

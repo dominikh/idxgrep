@@ -51,6 +51,25 @@ func (t Term) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v)
 }
 
+type Match struct {
+	Key   string
+	Value interface{}
+}
+
+func (m Match) MarshalJSON() ([]byte, error) {
+	type value struct {
+		Query interface{} `json:"query"`
+	}
+
+	v := struct {
+		Match map[string]value `json:"match"`
+	}{
+		map[string]value{m.Key: value{m.Value}},
+	}
+
+	return json.Marshal(v)
+}
+
 type SearchHit struct {
 	Index  string          `json:"_index"`
 	Type   string          `json:"_type"`
@@ -68,13 +87,13 @@ type searchResult struct {
 	Hits searchHits `json:"hits"`
 }
 
-func (client *Client) Search(s Search) ([]SearchHit, error) {
+func (client *Client) Search(s Search, count int) ([]SearchHit, error) {
 	b, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/_search?size=10000", client.Base, client.Index), bytes.NewReader(b))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/_search?size=%d", client.Base, client.Index, count), bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
