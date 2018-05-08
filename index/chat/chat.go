@@ -84,7 +84,8 @@ func (idx *Index) CreateIndex() error {
           "normalizer": {
             "username": {
               "type": "custom",
-              "char_filter": ["username"]
+              "char_filter": ["username"],
+              "filter": ["lowercase"]
             }
           }
         }
