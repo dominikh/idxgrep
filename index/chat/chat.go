@@ -56,6 +56,7 @@ func (m *Message) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+	m.Conversation = msg.Conversation
 	m.Time = time.Unix(0, int64(msg.Time)*int64(time.Millisecond))
 	m.From = msg.From
 	m.To = msg.To
