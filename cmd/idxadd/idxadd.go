@@ -47,6 +47,11 @@ func main() {
 		idx = &chat.Weechat{
 			Client: client,
 		}
+	case "discord":
+		client.Index = cfg.ChatIndex.Index
+		idx = &chat.Discord{
+			Client: client,
+		}
 	default:
 		log.Fatalln("Unknown index type", fIndex)
 	}
