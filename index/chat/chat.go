@@ -87,6 +87,14 @@ func (idx *Index) CreateIndex() error {
         "number_of_shards": 1,
         "number_of_replicas": 0,
         "analysis": {
+          "filter": {
+            "shingles": {
+              "type": "shingle",
+              "min_shingle_size": 2,
+              "max_shingle_size": 2,
+              "output_unigrams": false
+            }
+          },
           "char_filter": {
             "username": {
               "type": "pattern_replace",
@@ -99,6 +107,13 @@ func (idx *Index) CreateIndex() error {
               "type": "custom",
               "char_filter": ["username"],
               "filter": ["lowercase"]
+            }
+          },
+          "analyzer": {
+            "shingles": {
+              "type": "custom",
+              "tokenizer": "standard",
+              "filter": ["lowercase", "shingles"]
             }
           }
         }
@@ -139,7 +154,13 @@ func (idx *Index) CreateIndex() error {
             },
             "message": {
               "type": "text",
-              "analyzer": "english"
+              "analyzer": "english",
+              "fields": {
+                "shingles": {
+                  "type": "text",
+                  "analyzer": "shingles"
+                }
+              }
             }
           }
         }

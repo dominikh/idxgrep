@@ -135,6 +135,7 @@ func queryChat(cfg *config.Config, opts chatOptions) {
 	}
 	if opts.message != "" {
 		q.And = append(q.And, es.Match{Key: "message", Value: opts.message})
+		q.Or = append(q.Or, es.Match{Key: "message.shingles", Value: opts.message})
 	}
 
 	s := es.Search{Query: q}
